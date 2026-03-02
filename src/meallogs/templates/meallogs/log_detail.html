@@ -37,6 +37,46 @@
       <button type="submit">保存</button>
     </form>
 
+    <h2>タグ</h2>
+    {% if tags %}
+      <ul>
+        {% for tag in tags %}
+          <li>
+            {{ tag.kind }}: {{ tag.name }}
+            <form method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/tags/{{ tag.id }}/delete">
+              {% csrf_token %}
+              <button type="submit">削除</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>タグはまだありません。</p>
+    {% endif %}
+
+    <form method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/tags/add">
+      {% csrf_token %}
+      <input type="hidden" name="tag_kind" value="{{ default_tag_kind }}" />
+      <input type="text" name="tag_name" placeholder="タグ名" />
+      <button type="submit">タグ追加</button>
+    </form>
+
+    {% if tag_candidates %}
+      <h3>候補</h3>
+      <ul>
+        {% for tag in tag_candidates %}
+          <li>
+            <form method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/tags/add">
+              {% csrf_token %}
+              <input type="hidden" name="tag_kind" value="{{ tag.kind }}" />
+              <input type="hidden" name="tag_name" value="{{ tag.name }}" />
+              <button type="submit">{{ tag.kind }}: {{ tag.name }}</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
     <h2>写真</h2>
     {% if photos %}
       <ul>
