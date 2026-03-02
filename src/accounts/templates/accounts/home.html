@@ -5,8 +5,17 @@
     <title>Home</title>
   </head>
   <body>
-    <h1>ログイン済み</h1>
+    <h1>ホーム</h1>
+
+    {% if show_welcome %}
+      <p>今日もここに来てくれてありがとうございます。記録はいつでも、できる範囲で大丈夫です。</p>
+    {% endif %}
+
     <p>login_id: {{ request.user.login_id }}</p>
+
+    <form method="get" action="/logs/today/">
+      <button type="submit">今日の記録へ</button>
+    </form>
 
     <form method="post" action="/logout/">
       {% csrf_token %}
