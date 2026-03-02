@@ -125,6 +125,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = PROJECT_ROOT / 'media'
+
 # Auth
 AUTH_USER_MODEL = 'accounts.CustomUser'
 LOGIN_URL = '/login/'
