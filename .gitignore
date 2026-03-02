@@ -11,3 +11,6 @@ logs/export_import/
 media/
 
 postgres_data/
+
+# SQLite (development only)
+*.sqlite3
