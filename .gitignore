@@ -1,0 +1,16 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+logs/app/
+logs/ai/
+logs/export_import/
+media/
+
+postgres_data/
+
+# SQLite (development only)
+*.sqlite3
