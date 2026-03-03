@@ -14,6 +14,20 @@ def meal_log_photo_upload_to(instance, filename):
     return f"meallogs/{instance.meal_log.user_id}/{log_date}/{name}"
 
 
+class Tag(models.Model):
+    kind = models.CharField(max_length=32)
+    name = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["kind", "name"], name="uniq_tag_kind_name"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.kind}:{self.name}"
+
+
 class MealLog(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     log_date = models.DateField()
@@ -21,6 +35,12 @@ class MealLog(models.Model):
     taste_level = models.PositiveSmallIntegerField(
         choices=TasteLevel.choices(),
         null=True,
+        blank=True,
+    )
+    tags = models.ManyToManyField(
+        Tag,
+        through="MealLogTag",
+        related_name="meal_logs",
         blank=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -33,6 +53,25 @@ class MealLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user_id}:{self.log_date}"
+
+
+class MealLogTag(models.Model):
+    meal_log = models.ForeignKey(
+        MealLog,
+        on_delete=models.CASCADE,
+        related_name="meal_log_tags",
+    )
+    tag = models.ForeignKey(
+        Tag,
+        on_delete=models.CASCADE,
+        related_name="tag_links",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["meal_log", "tag"], name="uniq_meallog_tag"),
+        ]
 
 
 class MealLogPhoto(models.Model):

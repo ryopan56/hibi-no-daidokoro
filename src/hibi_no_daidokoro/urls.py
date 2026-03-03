@@ -15,6 +15,8 @@ urlpatterns = [
     path('logs/today/', accounts_views.today_logs, name='logs_today'),
     path('logs/<log_date>/', meallogs_views.log_detail, name='meallog_detail'),
     path('logs/<log_date>/photos', meallogs_views.upload_photos, name='meallog_upload_photos'),
+    path('logs/<log_date>/tags/add', meallogs_views.add_tag, name='meallog_add_tag'),
+    path('logs/<log_date>/tags/<int:tag_id>/delete', meallogs_views.delete_tag, name='meallog_delete_tag'),
     path('photos/<int:photo_id>/delete', meallogs_views.delete_photo, name='meallog_delete_photo'),
     path('admin/', admin.site.urls),
 ]

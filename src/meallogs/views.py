@@ -8,11 +8,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import MealLogForm
-from .models import MealLog, MealLogPhoto
+from .models import MealLog, MealLogPhoto, MealLogTag, Tag
 
 logger = logging.getLogger(__name__)
 
 MAX_PHOTOS_PER_LOG = 10
+MAX_TAG_CANDIDATES = 20
+DEFAULT_TAG_KIND = "general"
 
 
 def _parse_log_date(log_date):
@@ -22,6 +24,14 @@ def _parse_log_date(log_date):
         raise Http404() from exc
 
 
+def _get_meallog_for_user(user, parsed_date):
+    meallog, created = MealLog.objects.get_or_create(
+        user=user,
+        log_date=parsed_date,
+    )
+    return meallog, created
+
+
 @require_http_methods(["GET", "POST"])
 @login_required
 def log_detail(request, log_date):
@@ -29,10 +39,7 @@ def log_detail(request, log_date):
 
     logger.info("meallog view start user=%s log_date=%s", request.user.login_id, log_date)
 
-    meallog, created = MealLog.objects.get_or_create(
-        user=request.user,
-        log_date=parsed_date,
-    )
+    meallog, created = _get_meallog_for_user(request.user, parsed_date)
     logger.info(
         "meallog get_or_create user=%s log_date=%s created=%s",
         request.user.login_id,
@@ -71,6 +78,12 @@ def log_detail(request, log_date):
     else:
         form = MealLogForm(instance=meallog)
 
+    candidates = (
+        Tag.objects.filter(meal_logs__user=request.user)
+        .distinct()
+        .order_by("kind", "name")[:MAX_TAG_CANDIDATES]
+    )
+
     response = render(
         request,
         "meallogs/log_detail.html",
@@ -78,6 +91,9 @@ def log_detail(request, log_date):
             "form": form,
             "log_date": parsed_date,
             "photos": meallog.photos.all(),
+            "tags": meallog.tags.all().order_by("kind", "name"),
+            "tag_candidates": candidates,
+            "default_tag_kind": DEFAULT_TAG_KIND,
         },
     )
     logger.info("meallog view end user=%s log_date=%s", request.user.login_id, log_date)
@@ -97,10 +113,7 @@ def upload_photos(request, log_date):
         len(files),
     )
 
-    meallog, created = MealLog.objects.get_or_create(
-        user=request.user,
-        log_date=parsed_date,
-    )
+    meallog, created = _get_meallog_for_user(request.user, parsed_date)
     logger.info(
         "meallog get_or_create user=%s log_date=%s created=%s",
         request.user.login_id,
@@ -165,3 +178,95 @@ def delete_photo(request, photo_id):
     photo.delete()
     logger.info("meallog delete end user=%s photo_id=%s", request.user.login_id, photo_id)
     return redirect("meallog_detail", log_date=photo.meal_log.log_date.isoformat())
+
+
+@require_POST
+@login_required
+def add_tag(request, log_date):
+    parsed_date = _parse_log_date(log_date)
+    tag_name = request.POST.get("tag_name", "").strip()
+    tag_kind = request.POST.get("tag_kind", DEFAULT_TAG_KIND).strip()
+
+    logger.info(
+        "meallog tag add start user=%s log_date=%s kind=%s name=%s",
+        request.user.login_id,
+        log_date,
+        tag_kind,
+        tag_name,
+    )
+
+    if not tag_name:
+        logger.info(
+            "meallog tag validation error user=%s log_date=%s reason=empty",
+            request.user.login_id,
+            log_date,
+        )
+        messages.error(request, "タグ名を入力してください。")
+        return redirect("meallog_detail", log_date=log_date)
+
+    if len(tag_name) > 64 or len(tag_kind) > 32:
+        logger.info(
+            "meallog tag validation error user=%s log_date=%s reason=length",
+            request.user.login_id,
+            log_date,
+        )
+        messages.error(request, "タグ名が長すぎます。短くして再度お試しください。")
+        return redirect("meallog_detail", log_date=log_date)
+
+    meallog, created = _get_meallog_for_user(request.user, parsed_date)
+    logger.info(
+        "meallog get_or_create user=%s log_date=%s created=%s",
+        request.user.login_id,
+        log_date,
+        created,
+    )
+
+    tag, _ = Tag.objects.get_or_create(kind=tag_kind, name=tag_name)
+    MealLogTag.objects.get_or_create(meal_log=meallog, tag=tag)
+
+    logger.info(
+        "meallog tag add end user=%s log_date=%s kind=%s name=%s",
+        request.user.login_id,
+        log_date,
+        tag_kind,
+        tag_name,
+    )
+    return redirect("meallog_detail", log_date=log_date)
+
+
+@require_POST
+@login_required
+def delete_tag(request, log_date, tag_id):
+    parsed_date = _parse_log_date(log_date)
+
+    logger.info(
+        "meallog tag delete start user=%s log_date=%s tag_id=%s",
+        request.user.login_id,
+        log_date,
+        tag_id,
+    )
+
+    meallog = get_object_or_404(MealLog, user=request.user, log_date=parsed_date)
+
+    try:
+        link = MealLogTag.objects.select_related("tag", "meal_log").get(
+            meal_log=meallog,
+            tag_id=tag_id,
+        )
+    except MealLogTag.DoesNotExist as exc:
+        logger.info(
+            "meallog tag delete forbidden user=%s log_date=%s tag_id=%s",
+            request.user.login_id,
+            log_date,
+            tag_id,
+        )
+        raise Http404() from exc
+
+    link.delete()
+    logger.info(
+        "meallog tag delete end user=%s log_date=%s tag_id=%s",
+        request.user.login_id,
+        log_date,
+        tag_id,
+    )
+    return redirect("meallog_detail", log_date=log_date)
