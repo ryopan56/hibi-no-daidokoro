@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import MealLogForm
-from .models import MealLog, MealLogPhoto, MealLogTag, Tag
+from .models import MealLog, MealLogIngredient, MealLogPhoto, MealLogTag, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +54,24 @@ def log_detail(request, log_date):
                 "time_minutes": meallog.time_minutes,
                 "taste_level": meallog.taste_level,
             }
+            before_categories = set(meallog.ingredients.values_list("category", flat=True))
+            before["ingredient_categories"] = sorted(before_categories)
             form.save()
+            selected_categories = set(form.cleaned_data.get("ingredient_categories") or [])
+            to_add = selected_categories - before_categories
+            to_remove = before_categories - selected_categories
+            if to_add:
+                MealLogIngredient.objects.bulk_create(
+                    [MealLogIngredient(meal_log=meallog, category=value) for value in to_add],
+                    ignore_conflicts=True,
+                )
+            if to_remove:
+                meallog.ingredients.filter(category__in=to_remove).delete()
+            after_categories = set(meallog.ingredients.values_list("category", flat=True))
             after = {
                 "time_minutes": meallog.time_minutes,
                 "taste_level": meallog.taste_level,
+                "ingredient_categories": sorted(after_categories),
             }
             logger.info(
                 "meallog save user=%s log_date=%s before=%s after=%s",
@@ -76,7 +90,14 @@ def log_detail(request, log_date):
             form.errors.as_json(),
         )
     else:
-        form = MealLogForm(instance=meallog)
+        form = MealLogForm(
+            instance=meallog,
+            initial={
+                "ingredient_categories": list(
+                    meallog.ingredients.values_list("category", flat=True)
+                )
+            },
+        )
 
     candidates = (
         Tag.objects.filter(meal_logs__user=request.user)
@@ -92,6 +113,7 @@ def log_detail(request, log_date):
             "log_date": parsed_date,
             "photos": meallog.photos.all(),
             "tags": meallog.tags.all().order_by("kind", "name"),
+            "ingredient_categories": meallog.ingredients.all().order_by("category"),
             "tag_candidates": candidates,
             "default_tag_kind": DEFAULT_TAG_KIND,
         },

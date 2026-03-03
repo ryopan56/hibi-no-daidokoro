@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
+from django.db import models
+
 
 class TasteLevel:
     _VALUES: Dict[int, Tuple[str, str]] = {
@@ -40,3 +42,12 @@ class TasteLevel:
     @classmethod
     def is_valid_code(cls, code: str) -> bool:
         return any(item_code == code for item_code, _ in cls._VALUES.values())
+
+
+class IngredientCategory(models.IntegerChoices):
+    MEAT = 0, "肉"
+    FISH = 1, "魚"
+    EGG = 2, "卵"
+    VEGETABLE = 3, "野菜"
+    BEAN = 4, "豆"
+    FROZEN = 5, "冷凍"

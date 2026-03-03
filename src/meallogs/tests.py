@@ -6,7 +6,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from PIL import Image
 
-from .models import MealLog, MealLogPhoto, MealLogTag, Tag
+from django.db import IntegrityError
+
+from .enums import IngredientCategory
+from .models import MealLog, MealLogIngredient, MealLogPhoto, MealLogTag, Tag
 
 
 def make_test_image(name='test.png'):
@@ -113,3 +116,108 @@ class MealLogTagTests(TestCase):
         response = self.client.get(f"/logs/{target_date.isoformat()}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '夕食')
+
+
+class MealLogIngredientTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            login_id='tester',
+            password='pass12345',
+        )
+        self.client.login(login_id='tester', password='pass12345')
+
+    def test_unique_constraint(self):
+        target_date = date(2026, 3, 2)
+        log = MealLog.objects.create(user=self.user, log_date=target_date)
+        MealLogIngredient.objects.create(
+            meal_log=log,
+            category=IngredientCategory.MEAT.value,
+        )
+        with self.assertRaises(IntegrityError):
+            MealLogIngredient.objects.create(
+                meal_log=log,
+                category=IngredientCategory.MEAT.value,
+            )
+
+    def test_save_update_categories(self):
+        target_date = date(2026, 3, 2)
+        url = f"/logs/{target_date.isoformat()}/"
+
+        response = self.client.post(
+            url,
+            {
+                "time_minutes": "",
+                "taste_level": "",
+                "ingredient_categories": [
+                    str(IngredientCategory.MEAT.value),
+                    str(IngredientCategory.VEGETABLE.value),
+                ],
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        log = MealLog.objects.get(user=self.user, log_date=target_date)
+        self.assertEqual(
+            set(log.ingredients.values_list("category", flat=True)),
+            {IngredientCategory.MEAT.value, IngredientCategory.VEGETABLE.value},
+        )
+
+        response = self.client.post(
+            url,
+            {
+                "time_minutes": "",
+                "taste_level": "",
+                "ingredient_categories": [
+                    str(IngredientCategory.FISH.value),
+                ],
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        log.refresh_from_db()
+        self.assertEqual(
+            set(log.ingredients.values_list("category", flat=True)),
+            {IngredientCategory.FISH.value},
+        )
+
+        response = self.client.post(
+            url,
+            {
+                "time_minutes": "",
+                "taste_level": "",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        log.refresh_from_db()
+        self.assertEqual(log.ingredients.count(), 0)
+
+    def test_other_users_log_not_affected(self):
+        target_date = date(2026, 3, 2)
+        other = get_user_model().objects.create_user(
+            login_id='other',
+            password='pass12345',
+        )
+        other_log = MealLog.objects.create(user=other, log_date=target_date)
+        MealLogIngredient.objects.create(
+            meal_log=other_log,
+            category=IngredientCategory.BEAN.value,
+        )
+
+        response = self.client.post(
+            f"/logs/{target_date.isoformat()}/",
+            {
+                "time_minutes": "",
+                "taste_level": "",
+                "ingredient_categories": [str(IngredientCategory.MEAT.value)],
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        other_log.refresh_from_db()
+        self.assertEqual(
+            set(other_log.ingredients.values_list("category", flat=True)),
+            {IngredientCategory.BEAN.value},
+        )

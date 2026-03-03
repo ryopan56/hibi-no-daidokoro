@@ -4,7 +4,7 @@ from pathlib import Path as SysPath
 from django.conf import settings
 from django.db import models
 
-from .enums import TasteLevel
+from .enums import IngredientCategory, TasteLevel
 
 
 def meal_log_photo_upload_to(instance, filename):
@@ -85,3 +85,18 @@ class MealLogPhoto(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+
+
+class MealLogIngredient(models.Model):
+    meal_log = models.ForeignKey(
+        MealLog,
+        on_delete=models.CASCADE,
+        related_name="ingredients",
+    )
+    category = models.SmallIntegerField(choices=IngredientCategory.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["meal_log", "category"], name="uniq_meallog_category"),
+        ]
