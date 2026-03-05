@@ -3,11 +3,13 @@ from datetime import date
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .forms import MealLogForm
+from .enums import IngredientCategory, TasteLevel
+from .forms import MealLogForm, MealLogSearchForm
 from .models import MealLog, MealLogIngredient, MealLogPhoto, MealLogTag, Tag
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,31 @@ def _get_meallog_for_user(user, parsed_date):
         log_date=parsed_date,
     )
     return meallog, created
+
+
+def _build_keyword_condition(keyword):
+    condition = Q(tags__name__icontains=keyword) | Q(tags__kind__icontains=keyword)
+    matched_categories = [
+        value
+        for value, label in IngredientCategory.choices
+        if keyword.casefold() in str(label).casefold()
+    ]
+    if matched_categories:
+        condition |= Q(ingredients__category__in=matched_categories)
+
+    matched_taste_levels = [
+        value
+        for value, label in TasteLevel.choices()
+        if keyword.casefold() in str(label).casefold()
+        or keyword.casefold() == TasteLevel.to_code(value).casefold()
+    ]
+    if matched_taste_levels:
+        condition |= Q(taste_level__in=matched_taste_levels)
+
+    if keyword.isdigit():
+        condition |= Q(time_minutes=int(keyword))
+
+    return condition
 
 
 @require_http_methods(["GET", "POST"])
@@ -120,6 +147,42 @@ def log_detail(request, log_date):
     )
     logger.info("meallog view end user=%s log_date=%s", request.user.login_id, log_date)
     return response
+
+
+@require_http_methods(["GET", "POST"])
+@login_required
+def search_logs(request):
+    form = MealLogSearchForm(request.POST or None)
+    meallogs = MealLog.objects.none()
+    searched = False
+
+    if request.method == "POST" and form.is_valid():
+        q = (form.cleaned_data.get("q") or "").strip()
+        date_from = form.cleaned_data.get("date_from")
+        date_to = form.cleaned_data.get("date_to")
+        keywords = [keyword for keyword in q.split() if keyword]
+
+        if keywords or date_from or date_to:
+            searched = True
+            queryset = MealLog.objects.filter(user=request.user)
+            if date_from:
+                queryset = queryset.filter(log_date__gte=date_from)
+            if date_to:
+                queryset = queryset.filter(log_date__lte=date_to)
+            for keyword in keywords:
+                queryset = queryset.filter(_build_keyword_condition(keyword))
+
+            meallogs = queryset.distinct().order_by("-log_date")
+
+    return render(
+        request,
+        "meallogs/search.html",
+        {
+            "form": form,
+            "meallogs": meallogs,
+            "searched": searched,
+        },
+    )
 
 
 @require_POST

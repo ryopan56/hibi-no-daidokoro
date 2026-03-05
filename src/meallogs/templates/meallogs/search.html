@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>検索</title>
+  </head>
+  <body>
+    <h1>過去ログ検索</h1>
+
+    <form method="post">
+      {% csrf_token %}
+      <div>
+        <label for="id_q">キーワード</label>
+        {{ form.q }}
+        {{ form.q.errors }}
+      </div>
+      <div>
+        <label for="id_date_from">開始日</label>
+        {{ form.date_from }}
+        {{ form.date_from.errors }}
+      </div>
+      <div>
+        <label for="id_date_to">終了日</label>
+        {{ form.date_to }}
+        {{ form.date_to.errors }}
+      </div>
+      <button type="submit">検索</button>
+    </form>
+
+    {% if searched %}
+      <h2>検索結果</h2>
+      {% if meallogs %}
+        <ul>
+          {% for meallog in meallogs %}
+            <li>
+              <a href="{% url 'meallog_detail' log_date=meallog.log_date|date:'Y-m-d' %}">
+                {{ meallog.log_date }}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>該当する記録はありません。</p>
+      {% endif %}
+    {% else %}
+      <p>キーワードまたは日付範囲を入力して検索してください。</p>
+    {% endif %}
+  </body>
+</html>

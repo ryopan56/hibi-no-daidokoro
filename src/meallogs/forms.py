@@ -50,3 +50,17 @@ class MealLogForm(forms.ModelForm):
         if any(value not in valid_values for value in parsed):
             raise forms.ValidationError("指定できない値です。")
         return parsed
+
+
+class MealLogSearchForm(forms.Form):
+    q = forms.CharField(required=False, label="キーワード")
+    date_from = forms.DateField(required=False, label="開始日")
+    date_to = forms.DateField(required=False, label="終了日")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        date_from = cleaned_data.get("date_from")
+        date_to = cleaned_data.get("date_to")
+        if date_from and date_to and date_from > date_to:
+            self.add_error("date_to", "開始日以降の日付を指定してください。")
+        return cleaned_data
