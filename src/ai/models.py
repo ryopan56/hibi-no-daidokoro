@@ -33,3 +33,21 @@ class AiUsageLog(models.Model):
     class Meta:
         db_table = 'ai_usage_logs'
         ordering = ['-created_at']
+
+
+class AiDailyUsage(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='ai_daily_usages',
+    )
+    jst_date = models.DateField()
+    used_count = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'ai_daily_usages'
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'jst_date'], name='uniq_ai_daily_usage_user_date')
+        ]
