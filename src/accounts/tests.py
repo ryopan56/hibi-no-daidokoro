@@ -106,6 +106,28 @@ class NotificationSettingsTests(TestCase):
 
     @patch('accounts.services.weekly_praise_trigger.current_week_start_jst')
     @patch('accounts.services.weekly_praise_trigger.generate_weekly_praise')
+    def test_weekly_praise_shown_even_if_notifications_disabled(self, mock_generate, mock_week_start):
+        current_week_start = date(2026, 3, 8)
+        mock_week_start.return_value = current_week_start
+        mock_generate.return_value = {
+            'headline': '今週の台所',
+            'message': '通知OFFでも週次肯定',
+        }
+
+        NotificationSettings.objects.create(
+            user=self.user,
+            notifications_enabled=False,
+            weekly_praise_enabled=True,
+            last_weekly_praise_shown_week_start=current_week_start - timedelta(days=7),
+        )
+
+        response = self.client.get('/home/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '通知OFFでも週次肯定')
+        self.assertEqual(mock_generate.call_count, 1)
+
+    @patch('accounts.services.weekly_praise_trigger.current_week_start_jst')
+    @patch('accounts.services.weekly_praise_trigger.generate_weekly_praise')
     def test_two_weeks_gap_still_shows_only_once_on_home(self, mock_generate, mock_week_start):
         current_week_start = date(2026, 3, 22)
         mock_week_start.return_value = current_week_start
