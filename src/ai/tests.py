@@ -171,6 +171,55 @@ class AiEndpointTests(TestCase):
         usage = AiUsageLog.objects.get()
         self.assertEqual(usage.jst_date, date(2026, 3, 6))
 
+    @patch('ai.views.OpenAIStructuredClient.suggest')
+    def test_seed_from_existing_usage_logs_when_daily_usage_missing(self, mock_suggest):
+        today = timezone.localdate()
+        AiUsageLog.objects.create(
+            user=self.user,
+            mode='minimum',
+            jst_date=today,
+            status='ok',
+            error_type=None,
+        )
+        AiUsageLog.objects.create(
+            user=self.user,
+            mode='recommend',
+            jst_date=today,
+            status='fallback',
+            error_type='api_error',
+        )
+        AiUsageLog.objects.create(
+            user=self.user,
+            mode='minimum',
+            jst_date=today,
+            status='rate_limited',
+            error_type=None,
+        )
+
+        mock_suggest.return_value = {
+            'message': 'ok',
+            'suggestions': [
+                {
+                    'title': 'test',
+                    'why': 'test',
+                    'estimated_time_minutes': 5,
+                    'ingredients': [],
+                    'steps': [],
+                }
+            ],
+        }
+
+        first = self._post_json('/ai/minimum', {'notes': 'seed'})
+        self.assertEqual(first.status_code, 200)
+        self.assertIn(first.json()['status'], ['ok', 'fallback'])
+
+        second = self._post_json('/ai/minimum', {'notes': 'seed'})
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.json()['status'], 'rate_limited')
+
+        daily = AiDailyUsage.objects.get(user=self.user, jst_date=today)
+        self.assertEqual(daily.used_count, 3)
+
 
 class AiRateLimitConcurrencyTests(TransactionTestCase):
     reset_sequences = True

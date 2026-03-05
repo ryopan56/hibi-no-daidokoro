@@ -153,24 +153,34 @@ def _save_usage_log(user, mode, jst_date, status, error_type=None):
 def _lock_daily_usage(user, jst_date):
     for _ in range(2):
         try:
-            daily_usage, _ = AiDailyUsage.objects.select_for_update().get_or_create(
+            daily_usage, created = AiDailyUsage.objects.select_for_update().get_or_create(
                 user=user,
                 jst_date=jst_date,
                 defaults={'used_count': 0},
             )
-            return daily_usage
+            return daily_usage, created
         except IntegrityError:
             continue
 
-    return AiDailyUsage.objects.select_for_update().get(
+    daily_usage = AiDailyUsage.objects.select_for_update().get(
         user=user,
         jst_date=jst_date,
     )
+    return daily_usage, False
 
 
 def _reserve_daily_quota(user, mode, jst_date):
     with transaction.atomic():
-        daily_usage = _lock_daily_usage(user=user, jst_date=jst_date)
+        daily_usage, created = _lock_daily_usage(user=user, jst_date=jst_date)
+        if created:
+            seed_count = AiUsageLog.objects.filter(
+                user=user,
+                jst_date=jst_date,
+                status__in=[AiUsageLog.STATUS_OK, AiUsageLog.STATUS_FALLBACK],
+            ).count()
+            daily_usage.used_count = min(seed_count, DAILY_LIMIT)
+            daily_usage.save(update_fields=['used_count', 'updated_at'])
+
         if daily_usage.used_count >= DAILY_LIMIT:
             payload = _rate_limited_response(mode)
             _save_usage_log(
