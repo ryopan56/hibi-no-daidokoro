@@ -1,5 +1,6 @@
 from datetime import date
 from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -301,3 +302,51 @@ class MealLogSearchTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "2026-03-08")
         self.assertNotContains(response, "2026-03-09")
+
+
+class MealLogCalendarTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            login_id='tester',
+            password='pass12345',
+        )
+        self.other_user = get_user_model().objects.create_user(
+            login_id='other',
+            password='pass12345',
+        )
+        self.client.login(login_id='tester', password='pass12345')
+
+    def test_login_required(self):
+        self.client.logout()
+        response = self.client.get("/calendar/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+
+    def test_show_month_and_mark_only_own_logged_days(self):
+        MealLog.objects.create(user=self.user, log_date=date(2026, 3, 3))
+        MealLog.objects.create(user=self.user, log_date=date(2026, 3, 15))
+        MealLog.objects.create(user=self.other_user, log_date=date(2026, 3, 9))
+
+        response = self.client.get("/calendar/?year=2026&month=3")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2026年3月")
+        self.assertContains(
+            response,
+            reverse("meallog_detail", kwargs={"log_date": "2026-03-03"}),
+        )
+        self.assertContains(
+            response,
+            reverse("meallog_detail", kwargs={"log_date": "2026-03-15"}),
+        )
+        self.assertContains(response, "●", count=2)
+
+    def test_invalid_year_month_fallback_to_today(self):
+        with patch("meallogs.views.date") as mock_date:
+            mock_date.today.return_value = date(2026, 4, 10)
+            mock_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
+
+            response = self.client.get("/calendar/?year=invalid&month=99")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2026年4月")

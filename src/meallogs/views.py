@@ -1,4 +1,5 @@
 import logging
+import calendar as py_calendar
 from datetime import date
 
 from django.contrib import messages
@@ -57,6 +58,24 @@ def _build_keyword_condition(keyword):
         condition |= Q(time_minutes=int(keyword))
 
     return condition
+
+
+def _parse_year_month(query_params):
+    today = date.today()
+    raw_year = query_params.get("year")
+    raw_month = query_params.get("month")
+
+    if raw_year is None and raw_month is None:
+        return today.year, today.month
+
+    try:
+        year = int(raw_year)
+        month = int(raw_month)
+        date(year, month, 1)
+    except (TypeError, ValueError):
+        return today.year, today.month
+
+    return year, month
 
 
 @require_http_methods(["GET", "POST"])
@@ -181,6 +200,57 @@ def search_logs(request):
             "form": form,
             "meallogs": meallogs,
             "searched": searched,
+        },
+    )
+
+
+@require_http_methods(["GET"])
+@login_required
+def calendar_view(request):
+    year, month = _parse_year_month(request.GET)
+    _, last_day = py_calendar.monthrange(year, month)
+    month_start = date(year, month, 1)
+    month_end = date(year, month, last_day)
+
+    logged_dates = set(
+        MealLog.objects.filter(
+            user=request.user,
+            log_date__gte=month_start,
+            log_date__lte=month_end,
+        ).values_list("log_date", flat=True)
+    )
+
+    weeks = []
+    for week in py_calendar.Calendar(firstweekday=6).monthdatescalendar(year, month):
+        week_cells = []
+        for day in week:
+            week_cells.append(
+                {
+                    "date": day,
+                    "in_month": day.month == month,
+                    "has_log": day in logged_dates,
+                }
+            )
+        weeks.append(week_cells)
+
+    prev_year = year - 1 if month == 1 else year
+    prev_month = 12 if month == 1 else month - 1
+    next_year = year + 1 if month == 12 else year
+    next_month = 1 if month == 12 else month + 1
+
+    return render(
+        request,
+        "meallogs/calendar.html",
+        {
+            "display_year": year,
+            "display_month": month,
+            "month_label": f"{year}年{month}月",
+            "day_names": ["日", "月", "火", "水", "木", "金", "土"],
+            "weeks": weeks,
+            "prev_year": prev_year,
+            "prev_month": prev_month,
+            "next_year": next_year,
+            "next_month": next_month,
         },
     )
 
