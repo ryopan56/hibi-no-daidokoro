@@ -94,7 +94,7 @@ def consume_weekly_praise_for_home(user):
     settings_obj = get_or_create_notification_settings(user)
     current_week_start = current_week_start_jst()
 
-    if not settings_obj.notifications_enabled or not settings_obj.weekly_praise_enabled:
+    if not settings_obj.weekly_praise_enabled:
         return None, settings_obj
 
     if settings_obj.last_weekly_praise_shown_week_start == current_week_start:
