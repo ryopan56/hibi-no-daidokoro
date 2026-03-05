@@ -3,6 +3,7 @@ from io import BytesIO
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.urls import reverse
 from django.test import Client, TestCase, override_settings
 from PIL import Image
 
@@ -221,3 +222,82 @@ class MealLogIngredientTests(TestCase):
             set(other_log.ingredients.values_list("category", flat=True)),
             {IngredientCategory.BEAN.value},
         )
+
+
+class MealLogSearchTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            login_id='tester',
+            password='pass12345',
+        )
+        self.other_user = get_user_model().objects.create_user(
+            login_id='other',
+            password='pass12345',
+        )
+        self.client.login(login_id='tester', password='pass12345')
+
+    def test_login_required(self):
+        self.client.logout()
+        response = self.client.get("/search")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+
+    def test_and_search_and_date_link(self):
+        hit_log = MealLog.objects.create(user=self.user, log_date=date(2026, 3, 3))
+        breakfast_tag, _ = Tag.objects.get_or_create(kind='general', name='朝食')
+        quick_tag, _ = Tag.objects.get_or_create(kind='general', name='時短')
+        hit_log.tags.add(breakfast_tag, quick_tag)
+
+        miss_log = MealLog.objects.create(user=self.user, log_date=date(2026, 3, 2))
+        miss_log.tags.add(breakfast_tag)
+
+        response = self.client.post(
+            "/search",
+            {"q": "朝食 時短"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2026-03-03")
+        self.assertNotContains(response, "2026-03-02")
+        self.assertContains(
+            response,
+            reverse("meallog_detail", kwargs={"log_date": "2026-03-03"}),
+        )
+
+    def test_date_range_filters(self):
+        MealLog.objects.create(user=self.user, log_date=date(2026, 3, 1))
+        MealLog.objects.create(user=self.user, log_date=date(2026, 3, 5))
+        MealLog.objects.create(user=self.user, log_date=date(2026, 3, 10))
+
+        response = self.client.post(
+            "/search",
+            {"date_from": "2026-03-02", "date_to": "2026-03-08"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2026-03-05")
+        self.assertNotContains(response, "2026-03-01")
+        self.assertNotContains(response, "2026-03-10")
+
+    def test_from_greater_than_to_shows_error(self):
+        response = self.client.post(
+            "/search",
+            {"date_from": "2026-03-10", "date_to": "2026-03-01"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "開始日以降の日付を指定してください。")
+
+    def test_search_only_own_logs(self):
+        own_log = MealLog.objects.create(user=self.user, log_date=date(2026, 3, 8))
+        dinner_tag, _ = Tag.objects.get_or_create(kind='general', name='夕食')
+        own_log.tags.add(dinner_tag)
+
+        other_log = MealLog.objects.create(user=self.other_user, log_date=date(2026, 3, 9))
+        other_log.tags.add(dinner_tag)
+
+        response = self.client.post(
+            "/search",
+            {"q": "夕食"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2026-03-08")
+        self.assertNotContains(response, "2026-03-09")

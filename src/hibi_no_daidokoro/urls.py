@@ -12,6 +12,8 @@ urlpatterns = [
     path('signup/', accounts_views.signup, name='signup'),
     path('login/', accounts_views.login_view, name='login'),
     path('logout/', accounts_views.logout_view, name='logout'),
+    path('search', meallogs_views.search_logs),
+    path('search/', meallogs_views.search_logs, name='meallog_search'),
     path('logs/today/', accounts_views.today_logs, name='logs_today'),
     path('logs/<log_date>/', meallogs_views.log_detail, name='meallog_detail'),
     path('logs/<log_date>/photos', meallogs_views.upload_photos, name='meallog_upload_photos'),
