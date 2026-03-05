@@ -12,6 +12,8 @@ urlpatterns = [
     path('signup/', accounts_views.signup, name='signup'),
     path('login/', accounts_views.login_view, name='login'),
     path('logout/', accounts_views.logout_view, name='logout'),
+    path('settings/notifications', accounts_views.notification_settings),
+    path('settings/notifications/', accounts_views.notification_settings, name='notification_settings'),
     path('search', meallogs_views.search_logs),
     path('search/', meallogs_views.search_logs, name='meallog_search'),
     path('calendar/', meallogs_views.calendar_view, name='meallog_calendar'),

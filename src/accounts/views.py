@@ -1,12 +1,17 @@
 import logging
 from datetime import date
 
+from django.contrib import messages
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .forms import LoginForm, SignupForm
+from .forms import LoginForm, NotificationSettingsForm, SignupForm
+from .services.weekly_praise_trigger import (
+    consume_weekly_praise_for_home,
+    get_or_create_notification_settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +83,7 @@ def home(request):
     if show_welcome:
         request.session[WELCOME_SHOWN_DATE_KEY] = today_str
         request.session[JUST_LOGGED_IN_KEY] = False
+    weekly_praise, _ = consume_weekly_praise_for_home(request.user)
 
     logger.info(
         "home access login_id=%s welcome=%s",
@@ -90,6 +96,7 @@ def home(request):
         "accounts/home.html",
         {
             "show_welcome": show_welcome,
+            "weekly_praise": weekly_praise,
         },
     )
 
@@ -98,3 +105,23 @@ def home(request):
 def today_logs(request):
     logger.info("today redirect login_id=%s", request.user.login_id)
     return render(request, "accounts/today.html")
+
+
+@require_http_methods(["GET", "POST"])
+@login_required
+def notification_settings(request):
+    settings_obj = get_or_create_notification_settings(request.user)
+    if request.method == "POST":
+        form = NotificationSettingsForm(request.POST, instance=settings_obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "通知設定を更新しました。")
+            return redirect("notification_settings")
+    else:
+        form = NotificationSettingsForm(instance=settings_obj)
+
+    return render(
+        request,
+        "accounts/notification_settings.html",
+        {"form": form},
+    )
