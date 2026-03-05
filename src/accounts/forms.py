@@ -1,6 +1,8 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
+from .models import NotificationSettings
+
 
 User = get_user_model()
 
@@ -32,3 +34,9 @@ class SignupForm(forms.ModelForm):
 class LoginForm(forms.Form):
     login_id = forms.CharField()
     password = forms.CharField(widget=forms.PasswordInput)
+
+
+class NotificationSettingsForm(forms.ModelForm):
+    class Meta:
+        model = NotificationSettings
+        fields = ['notifications_enabled', 'weekly_praise_enabled']

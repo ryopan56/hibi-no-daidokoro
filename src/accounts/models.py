@@ -1,5 +1,6 @@
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -40,3 +41,33 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.login_id
+
+
+class NotificationSettings(models.Model):
+    PRAISE_STATUS_OK = 'ok'
+    PRAISE_STATUS_FALLBACK = 'fallback'
+    PRAISE_STATUS_CHOICES = [
+        (PRAISE_STATUS_OK, 'ok'),
+        (PRAISE_STATUS_FALLBACK, 'fallback'),
+    ]
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notification_settings',
+    )
+    notifications_enabled = models.BooleanField(default=True)
+    weekly_praise_enabled = models.BooleanField(default=True)
+    last_weekly_praise_shown_week_start = models.DateField(null=True, blank=True)
+    last_weekly_praise_generated_week_start = models.DateField(null=True, blank=True)
+    weekly_praise_payload_json = models.JSONField(null=True, blank=True)
+    weekly_praise_status = models.CharField(
+        max_length=16,
+        choices=PRAISE_STATUS_CHOICES,
+        null=True,
+        blank=True,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'notification_settings'

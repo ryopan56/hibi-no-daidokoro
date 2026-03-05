@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}通知設定{% endblock %}
+
+{% block content %}
+  <h1>通知設定</h1>
+
+  {% if messages %}
+    {% for message in messages %}
+      <p>{{ message }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <div>
+      <label for="id_notifications_enabled">アプリ内通知を表示する</label>
+      {{ form.notifications_enabled }}
+    </div>
+    <div>
+      <label for="id_weekly_praise_enabled">週次肯定を表示する</label>
+      {{ form.weekly_praise_enabled }}
+    </div>
+    <button type="submit">保存</button>
+  </form>
+{% endblock %}
