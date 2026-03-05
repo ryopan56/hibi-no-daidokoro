@@ -14,6 +14,7 @@ urlpatterns = [
     path('logout/', accounts_views.logout_view, name='logout'),
     path('search', meallogs_views.search_logs),
     path('search/', meallogs_views.search_logs, name='meallog_search'),
+    path('calendar/', meallogs_views.calendar_view, name='meallog_calendar'),
     path('logs/today/', accounts_views.today_logs, name='logs_today'),
     path('logs/<log_date>/', meallogs_views.log_detail, name='meallog_detail'),
     path('logs/<log_date>/photos', meallogs_views.upload_photos, name='meallog_upload_photos'),
