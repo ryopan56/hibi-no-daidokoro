@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
 from .models import NotificationSettings
+from .services.weekly_praise_trigger import current_week_start_jst
 from .services.weekly_praise import WEEKLY_PRAISE_FALLBACK, WeeklyPraiseError
 
 
@@ -152,3 +153,15 @@ class NotificationSettingsTests(TestCase):
 
         settings_obj.refresh_from_db()
         self.assertEqual(settings_obj.weekly_praise_status, NotificationSettings.PRAISE_STATUS_FALLBACK)
+
+
+class WeeklyPraiseWeekStartTests(TestCase):
+    @patch('accounts.services.weekly_praise_trigger.timezone.localdate')
+    def test_week_start_on_sunday(self, mock_localdate):
+        mock_localdate.return_value = date(2026, 3, 8)  # Sunday
+        self.assertEqual(current_week_start_jst(), date(2026, 3, 8))
+
+    @patch('accounts.services.weekly_praise_trigger.timezone.localdate')
+    def test_week_start_on_monday(self, mock_localdate):
+        mock_localdate.return_value = date(2026, 3, 9)  # Monday
+        self.assertEqual(current_week_start_jst(), date(2026, 3, 8))
