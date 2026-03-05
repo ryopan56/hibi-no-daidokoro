@@ -1,0 +1,28 @@
+# hibi-no-daidokoro/.codex/config.toml
+# 方針:
+# - Codex本体の一般ネットワークはOFF
+# - GitHub操作は GitHub MCP 経由のみ
+# - GitHub MCP では PR 作成・更新だけ許可する
+# - push はローカル git を使う
+
+web_search = "disabled"
+
+[sandbox_workspace_write]
+network_access = false
+
+[mcp_servers.github]
+command = "docker"
+args = [
+  "run", "-i", "--rm",
+  "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+  "ghcr.io/github/github-mcp-server"
+]
+
+# ホスト環境から、この変数だけMCPへ渡す
+env_vars = ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+
+# 許可するツールを最小化
+enabled_tools = ["create_pull_request", "update_pull_request"]
+
+startup_timeout_sec = 20
+tool_timeout_sec = 60
