@@ -2,11 +2,12 @@ import json
 import logging
 
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import AiUsageLog
+from .models import AiDailyUsage, AiUsageLog
 from .services.ai_client import AITimeoutError, AIClientError, OpenAIStructuredClient
 
 logger = logging.getLogger(__name__)
@@ -149,6 +150,43 @@ def _save_usage_log(user, mode, jst_date, status, error_type=None):
     )
 
 
+def _lock_daily_usage(user, jst_date):
+    for _ in range(2):
+        try:
+            daily_usage, _ = AiDailyUsage.objects.select_for_update().get_or_create(
+                user=user,
+                jst_date=jst_date,
+                defaults={'used_count': 0},
+            )
+            return daily_usage
+        except IntegrityError:
+            continue
+
+    return AiDailyUsage.objects.select_for_update().get(
+        user=user,
+        jst_date=jst_date,
+    )
+
+
+def _reserve_daily_quota(user, mode, jst_date):
+    with transaction.atomic():
+        daily_usage = _lock_daily_usage(user=user, jst_date=jst_date)
+        if daily_usage.used_count >= DAILY_LIMIT:
+            payload = _rate_limited_response(mode)
+            _save_usage_log(
+                user=user,
+                mode=mode,
+                jst_date=jst_date,
+                status=AiUsageLog.STATUS_RATE_LIMITED,
+                error_type=None,
+            )
+            return False, payload
+
+        daily_usage.used_count += 1
+        daily_usage.save(update_fields=['used_count', 'updated_at'])
+        return True, None
+
+
 def _parse_json_request(request):
     content_type = request.headers.get('Content-Type', '')
     if 'application/json' not in content_type:
@@ -162,18 +200,9 @@ def _parse_json_request(request):
 
 def _handle_ai_request(request, mode):
     jst_date = timezone.localdate()
-    used_count = AiUsageLog.objects.filter(user=request.user, jst_date=jst_date).count()
-
-    if used_count >= DAILY_LIMIT:
-        payload = _rate_limited_response(mode)
-        _save_usage_log(
-            user=request.user,
-            mode=mode,
-            jst_date=jst_date,
-            status=AiUsageLog.STATUS_RATE_LIMITED,
-            error_type=None,
-        )
-        return JsonResponse(payload)
+    reserved, limited_payload = _reserve_daily_quota(user=request.user, mode=mode, jst_date=jst_date)
+    if not reserved:
+        return JsonResponse(limited_payload)
 
     try:
         request_payload = _normalize_payload(_parse_json_request(request))
