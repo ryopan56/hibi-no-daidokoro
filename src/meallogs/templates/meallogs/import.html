@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}バックアップ復元{% endblock %}
+
+{% block content %}
+  <h1>バックアップを復元する</h1>
+  <p>同じユーザーとして書き出した ZIP を復元できます。</p>
+  <p>復元すると、現在の記録は元に戻せません（復元前に必要なら再度バックアップしてください）。</p>
+
+  <form method="post" action="{% url 'meallog_import' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">ZIP をアップロードして復元</button>
+  </form>
+{% endblock %}

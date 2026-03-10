@@ -17,6 +17,8 @@ urlpatterns = [
     path('search', meallogs_views.search_logs),
     path('search/', meallogs_views.search_logs, name='meallog_search'),
     path('calendar/', meallogs_views.calendar_view, name='meallog_calendar'),
+    path('export/', meallogs_views.export_backup, name='meallog_export'),
+    path('import/', meallogs_views.import_backup, name='meallog_import'),
     path('ai/', include('ai.urls')),
     path('logs/today/', accounts_views.today_logs, name='logs_today'),
     path('logs/<log_date>/', meallogs_views.log_detail, name='meallog_detail'),
