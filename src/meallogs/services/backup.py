@@ -5,7 +5,7 @@ from io import BytesIO
 from pathlib import PurePosixPath
 from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
-from django.core.files.base import ContentFile
+from django.core.files import File
 from django.core.files.storage import default_storage
 from django.db import transaction
 
@@ -31,7 +31,6 @@ class BackupValidationError(Exception):
 @dataclass(frozen=True)
 class ParsedPhoto:
     path: str
-    content: bytes
 
 
 @dataclass(frozen=True)
@@ -56,8 +55,12 @@ def export_user_backup(user) -> bytes:
 
     for meal_log in meal_logs:
         log_date_str = meal_log.log_date.isoformat()
-        ingredient_values = set(meal_log.ingredients.values_list("category", flat=True))
+        ingredient_values = {ingredient.category for ingredient in meal_log.ingredients.all()}
         photos_payload = []
+        sorted_tags = sorted(
+            meal_log.tags.all(),
+            key=lambda tag: (tag.kind, tag.name, tag.id),
+        )
 
         for photo in meal_log.photos.all():
             filename = PurePosixPath(photo.image.name).name
@@ -77,7 +80,7 @@ def export_user_backup(user) -> bytes:
                 ],
                 "tags": [
                     {"kind": tag.kind, "name": tag.name}
-                    for tag in meal_log.tags.all().order_by("kind", "name", "id")
+                    for tag in sorted_tags
                 ],
                 "photos": photos_payload,
             }
@@ -100,13 +103,15 @@ def export_user_backup(user) -> bytes:
 
 def import_user_backup(user, uploaded_file) -> None:
     parsed_logs = _parse_backup(uploaded_file)
+    uploaded_file.seek(0)
     old_file_names = list(
         MealLogPhoto.objects.filter(meal_log__user=user).values_list("image", flat=True)
     )
     created_file_names: list[str] = []
 
     try:
-        with transaction.atomic():
+        with ZipFile(uploaded_file) as archive, transaction.atomic():
+            photo_entries = _build_photo_entries(archive)
             MealLog.objects.filter(user=user).delete()
 
             for parsed_log in parsed_logs:
@@ -133,14 +138,16 @@ def import_user_backup(user, uploaded_file) -> None:
                     MealLogTag.objects.get_or_create(meal_log=meal_log, tag=tag)
 
                 for parsed_photo in parsed_log.photos:
+                    photo_entry = photo_entries[parsed_photo.path]
                     photo = MealLogPhoto(meal_log=meal_log)
-                    photo.image.save(
-                        PurePosixPath(parsed_photo.path).name,
-                        ContentFile(parsed_photo.content),
-                        save=False,
-                    )
-                    created_file_names.append(photo.image.name)
-                    photo.save()
+                    with archive.open(photo_entry) as photo_file:
+                        photo.image.save(
+                            PurePosixPath(parsed_photo.path).name,
+                            File(photo_file),
+                            save=False,
+                        )
+                        created_file_names.append(photo.image.name)
+                        photo.save()
 
             transaction.on_commit(lambda: _delete_files(old_file_names))
     except Exception:
@@ -152,44 +159,13 @@ def import_user_backup(user, uploaded_file) -> None:
 def _parse_backup(uploaded_file) -> list[ParsedLog]:
     try:
         with ZipFile(uploaded_file) as archive:
-            normalized_names: set[str] = set()
-            photo_contents: dict[str, bytes] = {}
-            logs_json_bytes = None
-            has_photos_dir = False
-
-            for info in archive.infolist():
-                normalized_path = _normalize_archive_path(info.filename)
-                if normalized_path in normalized_names:
-                    raise BackupValidationError("ZIP 内に重複したパスがあります。")
-                normalized_names.add(normalized_path)
-
-                if normalized_path == LOGS_JSON_PATH:
-                    if info.is_dir():
-                        raise BackupValidationError("logs.json の構造が不正です。")
-                    logs_json_bytes = archive.read(info)
-                    continue
-
-                if normalized_path == PHOTOS_DIR:
-                    if not info.is_dir():
-                        raise BackupValidationError("photos ディレクトリの構造が不正です。")
-                    has_photos_dir = True
-                    continue
-
-                if info.is_dir():
-                    raise BackupValidationError("ZIP 内のディレクトリ構造が不正です。")
-
-                if normalized_path.startswith(f"{PHOTOS_DIR}/"):
-                    has_photos_dir = True
-                    photo_contents[normalized_path] = archive.read(info)
-                    continue
-
-                raise BackupValidationError("ZIP 内に想定外のファイルがあります。")
+            logs_json_bytes, photo_paths, has_photos_dir = _scan_archive(archive)
     except BadZipFile as exc:
         raise BackupValidationError("ZIP ファイルを解凍できませんでした。") from exc
 
     if logs_json_bytes is None:
         raise BackupValidationError("logs.json が見つかりません。")
-    if not has_photos_dir:
+    if not has_photos_dir and not photo_paths:
         raise BackupValidationError("photos ディレクトリが見つかりません。")
 
     try:
@@ -197,7 +173,52 @@ def _parse_backup(uploaded_file) -> list[ParsedLog]:
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise BackupValidationError("logs.json を読み取れませんでした。") from exc
 
-    return _validate_payload(payload, photo_contents)
+    return _validate_payload(payload, photo_paths)
+
+
+def _scan_archive(archive: ZipFile) -> tuple[bytes | None, set[str], bool]:
+    normalized_names: set[str] = set()
+    logs_json_bytes = None
+    photo_paths: set[str] = set()
+    has_photos_dir = False
+
+    for info in archive.infolist():
+        normalized_path = _normalize_archive_path(info.filename)
+        if normalized_path in normalized_names:
+            raise BackupValidationError("ZIP 内に重複したパスがあります。")
+        normalized_names.add(normalized_path)
+
+        if normalized_path == LOGS_JSON_PATH:
+            if info.is_dir():
+                raise BackupValidationError("logs.json の構造が不正です。")
+            logs_json_bytes = archive.read(info)
+            continue
+
+        if normalized_path == PHOTOS_DIR:
+            if not info.is_dir():
+                raise BackupValidationError("photos ディレクトリの構造が不正です。")
+            has_photos_dir = True
+            continue
+
+        if info.is_dir():
+            raise BackupValidationError("ZIP 内のディレクトリ構造が不正です。")
+
+        if normalized_path.startswith(f"{PHOTOS_DIR}/"):
+            photo_paths.add(normalized_path)
+            continue
+
+        raise BackupValidationError("ZIP 内に想定外のファイルがあります。")
+
+    return logs_json_bytes, photo_paths, has_photos_dir
+
+
+def _build_photo_entries(archive: ZipFile) -> dict[str, str]:
+    photo_entries = {}
+    for info in archive.infolist():
+        normalized_path = _normalize_archive_path(info.filename)
+        if normalized_path.startswith(f"{PHOTOS_DIR}/") and not info.is_dir():
+            photo_entries[normalized_path] = info.filename
+    return photo_entries
 
 
 def _normalize_archive_path(path: str) -> str:
@@ -230,7 +251,7 @@ def _normalize_archive_path(path: str) -> str:
     raise BackupValidationError("ZIP 内の構造が不正です。")
 
 
-def _validate_payload(payload, photo_contents: dict[str, bytes]) -> list[ParsedLog]:
+def _validate_payload(payload, photo_paths: set[str]) -> list[ParsedLog]:
     if not isinstance(payload, dict):
         raise BackupValidationError("logs.json の形式が不正です。")
     if set(payload.keys()) != {"version", "logs"}:
@@ -325,17 +346,12 @@ def _validate_payload(payload, photo_contents: dict[str, bytes]) -> list[ParsedL
             normalized_photo_path = _normalize_archive_path(photo_path)
             if not normalized_photo_path.startswith(f"{PHOTOS_DIR}/{log_date.isoformat()}/"):
                 raise BackupValidationError("photo path と log_date が一致しません。")
-            if normalized_photo_path not in photo_contents:
+            if normalized_photo_path not in photo_paths:
                 raise BackupValidationError("ZIP 内に不足している写真があります。")
             if normalized_photo_path in referenced_photo_paths:
                 raise BackupValidationError("photo path が重複しています。")
             referenced_photo_paths.add(normalized_photo_path)
-            parsed_photos.append(
-                ParsedPhoto(
-                    path=normalized_photo_path,
-                    content=photo_contents[normalized_photo_path],
-                )
-            )
+            parsed_photos.append(ParsedPhoto(path=normalized_photo_path))
 
         parsed_logs.append(
             ParsedLog(
@@ -348,7 +364,7 @@ def _validate_payload(payload, photo_contents: dict[str, bytes]) -> list[ParsedL
             )
         )
 
-    if referenced_photo_paths != set(photo_contents.keys()):
+    if referenced_photo_paths != photo_paths:
         raise BackupValidationError("ZIP 内に参照されていない写真があります。")
 
     return parsed_logs
