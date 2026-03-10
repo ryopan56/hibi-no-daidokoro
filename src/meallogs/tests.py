@@ -1,8 +1,12 @@
 from datetime import date
 from io import BytesIO
+import json
+import tempfile
 from unittest.mock import patch
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.contrib.auth import get_user_model
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.test import Client, TestCase, override_settings
@@ -10,7 +14,7 @@ from PIL import Image
 
 from django.db import IntegrityError
 
-from .enums import IngredientCategory
+from .enums import IngredientCategory, TasteLevel
 from .models import MealLog, MealLogIngredient, MealLogPhoto, MealLogTag, Tag
 
 
@@ -350,3 +354,291 @@ class MealLogCalendarTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "2026年4月")
+
+
+class MealLogBackupTests(TestCase):
+    def setUp(self):
+        self.media_root = tempfile.TemporaryDirectory()
+        self.override = override_settings(MEDIA_ROOT=self.media_root.name)
+        self.override.enable()
+        self.addCleanup(self.override.disable)
+        self.addCleanup(self.media_root.cleanup)
+
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            login_id='tester',
+            password='pass12345',
+        )
+        self.other_user = get_user_model().objects.create_user(
+            login_id='other',
+            password='pass12345',
+        )
+        self.client.login(login_id='tester', password='pass12345')
+
+    def _build_backup_upload(self, payload, photo_files=None, include_photos_dir=False):
+        photo_files = photo_files or {}
+        buffer = BytesIO()
+        with ZipFile(buffer, 'w', compression=ZIP_DEFLATED) as archive:
+            archive.writestr('logs.json', json.dumps(payload, ensure_ascii=False))
+            if include_photos_dir:
+                archive.writestr('photos/', b'')
+            for path, content in photo_files.items():
+                archive.writestr(path, content)
+        return SimpleUploadedFile(
+            'backup.zip',
+            buffer.getvalue(),
+            content_type='application/zip',
+        )
+
+    def test_export_backup_zip_contains_schema_conform_logs_json(self):
+        log = MealLog.objects.create(
+            user=self.user,
+            log_date=date(2026, 3, 2),
+            time_minutes=30,
+            taste_level=TasteLevel.from_code('HIGH'),
+        )
+        MealLogIngredient.objects.create(
+            meal_log=log,
+            category=IngredientCategory.MEAT.value,
+        )
+        MealLogIngredient.objects.create(
+            meal_log=log,
+            category=IngredientCategory.VEGETABLE.value,
+        )
+        breakfast_tag = Tag.objects.create(kind='general', name='朝食')
+        quick_tag = Tag.objects.create(kind='general', name='時短')
+        MealLogTag.objects.create(meal_log=log, tag=breakfast_tag)
+        MealLogTag.objects.create(meal_log=log, tag=quick_tag)
+        MealLogPhoto.objects.create(meal_log=log, image=make_test_image('breakfast.png'))
+
+        response = self.client.post(reverse('meallog_export'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/zip')
+        self.assertIn(
+            'attachment; filename="hibi-no-daidokoro-backup-',
+            response['Content-Disposition'],
+        )
+
+        with ZipFile(BytesIO(response.content)) as archive:
+            self.assertIn('logs.json', archive.namelist())
+            self.assertTrue(any(name.startswith('photos/') for name in archive.namelist()))
+            payload = json.loads(archive.read('logs.json').decode('utf-8'))
+
+        self.assertEqual(payload['version'], 1)
+        self.assertEqual(len(payload['logs']), 1)
+
+        exported_log = payload['logs'][0]
+        self.assertEqual(
+            set(exported_log.keys()),
+            {
+                'log_date',
+                'time_minutes',
+                'taste_level',
+                'ingredient_categories',
+                'tags',
+                'photos',
+            },
+        )
+        self.assertEqual(exported_log['log_date'], '2026-03-02')
+        self.assertEqual(exported_log['time_minutes'], 30)
+        self.assertEqual(exported_log['taste_level'], 'HIGH')
+        self.assertEqual(exported_log['ingredient_categories'], ['MEAT', 'VEGETABLE'])
+        self.assertEqual(
+            exported_log['tags'],
+            [
+                {'kind': 'general', 'name': '時短'},
+                {'kind': 'general', 'name': '朝食'},
+            ],
+        )
+        self.assertEqual(len(exported_log['photos']), 1)
+        self.assertRegex(exported_log['photos'][0]['path'], r'^photos/2026-03-02/[^/]+$')
+
+    def test_import_backup_overwrites_existing_logs_and_restores_photo_without_dir_entry(self):
+        old_log = MealLog.objects.create(
+            user=self.user,
+            log_date=date(2026, 3, 10),
+            time_minutes=10,
+        )
+        old_photo = MealLogPhoto.objects.create(
+            meal_log=old_log,
+            image=make_test_image('old.png'),
+        )
+        old_file_name = old_photo.image.name
+
+        payload = {
+            'version': 1,
+            'logs': [
+                {
+                    'log_date': '2026-03-02',
+                    'time_minutes': 45,
+                    'taste_level': 'MEDIUM',
+                    'ingredient_categories': ['FISH', 'BEAN'],
+                    'tags': [
+                        {'kind': 'general', 'name': '夕食'},
+                    ],
+                    'photos': [
+                        {'path': 'photos/2026-03-02/restored.png'},
+                    ],
+                }
+            ],
+        }
+        upload = self._build_backup_upload(
+            payload,
+            photo_files={
+                'photos/2026-03-02/restored.png': make_test_image('restored.png').read(),
+            },
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse('meallog_import'),
+                {'backup_file': upload},
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'バックアップを復元しました。')
+        self.assertFalse(
+            MealLog.objects.filter(user=self.user, log_date=date(2026, 3, 10)).exists()
+        )
+
+        restored_log = MealLog.objects.get(user=self.user, log_date=date(2026, 3, 2))
+        self.assertEqual(restored_log.time_minutes, 45)
+        self.assertEqual(restored_log.taste_level, TasteLevel.from_code('MEDIUM'))
+        self.assertEqual(
+            set(restored_log.ingredients.values_list('category', flat=True)),
+            {IngredientCategory.FISH.value, IngredientCategory.BEAN.value},
+        )
+        self.assertEqual(
+            list(restored_log.tags.values_list('kind', 'name')),
+            [('general', '夕食')],
+        )
+        self.assertEqual(restored_log.photos.count(), 1)
+        self.assertTrue(default_storage.exists(restored_log.photos.get().image.name))
+        self.assertFalse(default_storage.exists(old_file_name))
+
+    def test_import_backup_restores_photo_with_photos_dir_entry(self):
+        payload = {
+            'version': 1,
+            'logs': [
+                {
+                    'log_date': '2026-03-03',
+                    'time_minutes': 20,
+                    'taste_level': 'LOW',
+                    'ingredient_categories': [],
+                    'tags': [],
+                    'photos': [
+                        {'path': 'photos/2026-03-03/with-dir.png'},
+                    ],
+                }
+            ],
+        }
+        upload = self._build_backup_upload(
+            payload,
+            photo_files={
+                'photos/2026-03-03/with-dir.png': make_test_image('with-dir.png').read(),
+            },
+            include_photos_dir=True,
+        )
+
+        response = self.client.post(
+            reverse('meallog_import'),
+            {'backup_file': upload},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'バックアップを復元しました。')
+        restored_log = MealLog.objects.get(user=self.user, log_date=date(2026, 3, 3))
+        self.assertEqual(restored_log.photos.count(), 1)
+
+    def test_import_backup_rejects_invalid_schema_and_paths(self):
+        invalid_cases = [
+            (
+                {
+                    'version': 1,
+                    'logs': [
+                        {
+                            'log_date': '2026-03-02',
+                            'time_minutes': 10,
+                            'taste_level': None,
+                            'ingredient_categories': [],
+                            'photos': [],
+                        }
+                    ],
+                },
+                {},
+                'ログ項目に想定外の項目があります。',
+            ),
+            (
+                {
+                    'version': 1,
+                    'logs': [
+                        {
+                            'log_date': '2026-03-02',
+                            'time_minutes': 10,
+                            'taste_level': None,
+                            'ingredient_categories': [],
+                            'tags': [],
+                            'photos': [
+                                {'path': '../evil.txt'},
+                            ],
+                        }
+                    ],
+                },
+                {},
+                'ZIP 内のパスが不正です。',
+            ),
+            (
+                {
+                    'version': 1,
+                    'logs': [
+                        {
+                            'log_date': '2026-03-02',
+                            'time_minutes': 10,
+                            'taste_level': None,
+                            'ingredient_categories': [],
+                            'tags': [],
+                            'photos': [
+                                {'path': 'images/evil.png'},
+                            ],
+                        }
+                    ],
+                },
+                {},
+                'ZIP 内の構造が不正です。',
+            ),
+        ]
+
+        for payload, photo_files, message in invalid_cases:
+            with self.subTest(message=message):
+                upload = self._build_backup_upload(
+                    payload,
+                    photo_files=photo_files,
+                    include_photos_dir=True,
+                )
+                response = self.client.post(reverse('meallog_import'), {'backup_file': upload})
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, message)
+
+    def test_import_backup_rejects_unexpected_top_level_file(self):
+        payload = {
+            'version': 1,
+            'logs': [],
+        }
+        buffer = BytesIO()
+        with ZipFile(buffer, 'w', compression=ZIP_DEFLATED) as archive:
+            archive.writestr('logs.json', json.dumps(payload))
+            archive.writestr('photos/', b'')
+            archive.writestr('extra.txt', b'bad')
+        upload = SimpleUploadedFile(
+            'backup.zip',
+            buffer.getvalue(),
+            content_type='application/zip',
+        )
+
+        response = self.client.post(reverse('meallog_import'), {'backup_file': upload})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'ZIP 内に想定外のファイルがあります。')
