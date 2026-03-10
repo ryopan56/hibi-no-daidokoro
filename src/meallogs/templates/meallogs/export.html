@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}バックアップ書き出し{% endblock %}
+
+{% block content %}
+  <h1>バックアップを書き出す</h1>
+  <p>現在ログイン中のユーザーに紐づく食事ログ、写真、タグなどを ZIP で保存できます。</p>
+  <p>復元先は同じユーザーのみです。復元すると、現在の記録は元に戻せません（復元前に必要なら再度バックアップしてください）。</p>
+
+  <form method="post" action="{% url 'meallog_export' %}">
+    {% csrf_token %}
+    <button type="submit">ZIP をダウンロード</button>
+  </form>
+{% endblock %}

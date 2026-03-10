@@ -5,13 +5,15 @@ from datetime import date
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .enums import IngredientCategory, TasteLevel
-from .forms import MealLogForm, MealLogSearchForm
+from .forms import BackupImportForm, MealLogForm, MealLogSearchForm
 from .models import MealLog, MealLogIngredient, MealLogPhoto, MealLogTag, Tag
+from .services import BackupValidationError, export_user_backup, import_user_backup
 
 logger = logging.getLogger(__name__)
 
@@ -253,6 +255,53 @@ def calendar_view(request):
             "next_month": next_month,
         },
     )
+
+
+@require_http_methods(["GET", "POST"])
+@login_required
+def export_backup(request):
+    if request.method == "POST":
+        logger.info("meallog export start user=%s", request.user.login_id)
+        backup_bytes = export_user_backup(request.user)
+        timestamp = timezone.localtime().strftime("%Y%m%d-%H%M%S")
+        response = HttpResponse(backup_bytes, content_type="application/zip")
+        response["Content-Disposition"] = (
+            f'attachment; filename="hibi-no-daidokoro-backup-{timestamp}.zip"'
+        )
+        logger.info("meallog export end user=%s", request.user.login_id)
+        return response
+
+    return render(request, "meallogs/export.html")
+
+
+@require_http_methods(["GET", "POST"])
+@login_required
+def import_backup(request):
+    if request.method == "POST":
+        form = BackupImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                logger.info("meallog import start user=%s", request.user.login_id)
+                import_user_backup(request.user, form.cleaned_data["backup_file"])
+            except BackupValidationError as exc:
+                form.add_error("backup_file", str(exc))
+            except Exception:
+                logger.exception("meallog import error user=%s", request.user.login_id)
+                form.add_error(
+                    "backup_file",
+                    "バックアップの復元に失敗しました。時間をおいて再度お試しください。",
+                )
+            else:
+                logger.info("meallog import end user=%s", request.user.login_id)
+                messages.success(
+                    request,
+                    "バックアップを復元しました。既存データは ZIP の内容で上書きされています。",
+                )
+                return redirect("meallog_import")
+    else:
+        form = BackupImportForm()
+
+    return render(request, "meallogs/import.html", {"form": form})
 
 
 @require_POST

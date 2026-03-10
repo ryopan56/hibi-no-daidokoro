@@ -64,3 +64,7 @@ class MealLogSearchForm(forms.Form):
         if date_from and date_to and date_from > date_to:
             self.add_error("date_to", "開始日以降の日付を指定してください。")
         return cleaned_data
+
+
+class BackupImportForm(forms.Form):
+    backup_file = forms.FileField(label="バックアップ ZIP")
