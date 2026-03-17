@@ -56,11 +56,11 @@ tool_timeout_sec = 60
 required = false
 
 ## Pencil の扱い
-- Pencil は VS Code 拡張として起動し、利用時にローカル MCP として使う
-- Pencil は GitHub / Notion のように `.codex/config.toml` に固定定義する前提ではなく、ローカル起動前提で扱う
-- Pencil の利用はフロントエンド作業時に限定する
-- Pencil フローでは、Codex は `.pen` を視覚設計の参照元として使う
-- ただし、人間承認の正本は引き続き承認済みモック画像とする
-- Pencil が使えない場合、有料化した場合、PoC の結果が不十分な場合は既存の「ChatGPT → 承認 → Codex」フローへ戻る
-- Pencil 利用時も、Codex 本体に広いネットワーク権限を与えない方針は維持する
-- 秘密情報や不要な環境変数を Pencil 経由で渡さない
+# - Pencil は VS Code 拡張として起動し、利用時にローカル MCP として使う
+# - Pencil は GitHub / Notion のように `.codex/config.toml` に固定定義する前提ではなく、ローカル起動前提で扱う
+# - Pencil の利用はフロントエンド作業時に限定する
+# - Pencil フローでは、Codex は `.pen` を視覚設計の参照元として使う
+# - ただし、人間承認の正本は引き続き承認済みモック画像とする
+# - Pencil が使えない場合、有料化した場合、PoC の結果が不十分な場合は既存の「ChatGPT → 承認 → Codex」フローへ戻る
+# - Pencil 利用時も、Codex 本体に広いネットワーク権限を与えない方針は維持する
+# - 秘密情報や不要な環境変数を Pencil 経由で渡さない
