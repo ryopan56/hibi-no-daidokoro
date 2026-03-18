@@ -15,6 +15,12 @@ class AuthFlowTests(TestCase):
     def setUp(self):
         self.client = Client()
 
+    def test_login_page_uses_root_relative_static_assets(self):
+        response = self.client.get('/login/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '/static/meallogs/ui-foundation.css')
+        self.assertContains(response, '/static/meallogs/ui-foundation.js')
+
     def test_signup_login_logout_flow(self):
         response = self.client.post(
             '/signup/',
