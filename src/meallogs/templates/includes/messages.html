@@ -1,0 +1,9 @@
+{% if messages %}
+  <div class="ui-message-list">
+    {% for message in messages %}
+      <div class="ui-message ui-message--{{ message.tags|default:'info' }}">
+        <p class="ui-message__text">{{ message }}</p>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

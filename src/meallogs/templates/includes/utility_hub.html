@@ -1,0 +1,12 @@
+<details class="ui-utility-hub">
+  <summary class="ui-utility-hub__summary">設定ハブ</summary>
+  <div class="ui-utility-hub__panel">
+    <a class="ui-utility-hub__link" href="{% url 'notification_settings' %}">通知設定</a>
+    <a class="ui-utility-hub__link" href="{% url 'meallog_export' %}">Export</a>
+    <a class="ui-utility-hub__link" href="{% url 'meallog_import' %}">Import</a>
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button class="ui-utility-hub__button" type="submit">ログアウト</button>
+    </form>
+  </div>
+</details>

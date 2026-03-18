@@ -642,3 +642,30 @@ class MealLogBackupTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'ZIP 内に想定外のファイルがあります。')
+
+
+class UiFoundationNavigationTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            login_id='nav-user',
+            password='pass12345',
+        )
+        self.client.login(login_id='nav-user', password='pass12345')
+
+    def test_search_page_uses_shared_shell(self):
+        response = self.client.get('/search/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '過去ログ検索')
+        self.assertContains(response, 'Home')
+        self.assertContains(response, 'Calendar')
+        self.assertContains(response, 'Search')
+        self.assertContains(response, '設定ハブ')
+
+    def test_calendar_page_uses_shared_shell(self):
+        response = self.client.get('/calendar/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'カレンダー')
+        self.assertContains(response, 'Home')
+        self.assertContains(response, 'Calendar')
+        self.assertContains(response, 'Search')

@@ -1,12 +1,19 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <title>今日の記録</title>
-  </head>
-  <body>
-    <h1>今日の記録</h1>
-    <p>このページは準備中です。</p>
-    <p><a href="/home/">ホームへ戻る</a></p>
-  </body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}今日の記録{% endblock %}
+
+{% block shell_title %}今日の記録{% endblock %}
+
+{% block shell_intro %}
+  <p class="ui-shell-header__intro">
+    Task12 では、今日の記録本体ではなく受け皿だけを整えます。
+  </p>
+{% endblock %}
+
+{% block content %}
+  <section class="ui-card">
+    <h2 class="ui-card__title">このページは準備中です</h2>
+    <p class="ui-card__text">ホームの主 CTA から入る先として、後続タスクで内容を整えます。</p>
+    <a class="ui-button-secondary" href="{% url 'home' %}">ホームへ戻る</a>
+  </section>
+{% endblock %}

@@ -2,39 +2,48 @@
 
 {% block title %}カレンダー{% endblock %}
 
-{% block content %}
-  <h1>月間カレンダー</h1>
-  <p>
-    <a href="{% url 'meallog_calendar' %}?year={{ prev_year }}&month={{ prev_month }}">前月</a>
-    {{ month_label }}
-    <a href="{% url 'meallog_calendar' %}?year={{ next_year }}&month={{ next_month }}">翌月</a>
-  </p>
+{% block shell_title %}カレンダー{% endblock %}
 
-  <table style="border-collapse: collapse;">
-    <thead>
-      <tr>
-        {% for day_name in day_names %}
-          <th style="border: 1px solid #ddd; width: 3rem;">{{ day_name }}</th>
-        {% endfor %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for week in weeks %}
+{% block shell_intro %}
+  <p class="ui-shell-header__intro">
+    ボトムナビの高頻度導線として、月単位で記録の有無を確認できる受け皿です。
+  </p>
+{% endblock %}
+
+{% block content %}
+  <section class="ui-card">
+    <div class="ui-calendar-nav">
+      <a class="ui-inline-button" href="{% url 'meallog_calendar' %}?year={{ prev_year }}&month={{ prev_month }}">前月</a>
+      <strong>{{ month_label }}</strong>
+      <a class="ui-inline-button" href="{% url 'meallog_calendar' %}?year={{ next_year }}&month={{ next_month }}">翌月</a>
+    </div>
+  </section>
+
+  <section class="ui-card">
+    <table class="ui-calendar-grid">
+      <thead>
         <tr>
-          {% for cell in week %}
-            <td style="position: relative; border: 1px solid #ddd; width: 3rem; height: 2.5rem; text-align: center;">
-              {% if cell.in_month %}
-                <a href="{% url 'meallog_detail' log_date=cell.date|date:'Y-m-d' %}">
-                  {{ cell.date.day }}
-                </a>
-                {% if cell.has_log %}
-                  <span style="position: absolute; right: 0.2rem; bottom: 0.1rem; font-size: 0.6rem; color: #666;">●</span>
-                {% endif %}
-              {% endif %}
-            </td>
+          {% for day_name in day_names %}
+            <th>{{ day_name }}</th>
           {% endfor %}
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% for week in weeks %}
+          <tr>
+            {% for cell in week %}
+              <td{% if not cell.in_month %} class="is-outside"{% endif %}>
+                {% if cell.in_month %}
+                  <a href="{% url 'meallog_detail' log_date=cell.date|date:'Y-m-d' %}">{{ cell.date.day }}</a>
+                  {% if cell.has_log %}
+                    <span class="ui-calendar-dot">●</span>
+                  {% endif %}
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
 {% endblock %}

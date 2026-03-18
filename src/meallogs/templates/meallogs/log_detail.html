@@ -1,110 +1,109 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <title>MealLog</title>
-  </head>
-  <body>
-    <h1>食事ログ</h1>
-    <p>日付: {{ log_date }}</p>
+{% extends "base.html" %}
 
-    {% if messages %}
-      <div>
-        {% for message in messages %}
-          <p>{{ message }}</p>
-        {% endfor %}
-      </div>
-    {% endif %}
+{% block title %}食事ログ{% endblock %}
 
+{% block shell_title %}食事ログ{% endblock %}
+
+{% block shell_intro %}
+  <p class="ui-shell-header__intro">日付: {{ log_date }}</p>
+{% endblock %}
+
+{% block content %}
+  <section class="ui-form-card">
     {% if form.non_field_errors %}
-      <div>
-        {{ form.non_field_errors }}
+      <div class="ui-error-summary">
+        <p class="ui-error-summary__title">入力内容を確認してください</p>
+        <ul class="ui-error-summary__list">
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
       </div>
     {% endif %}
 
-    <form method="post">
+    <form class="ui-form" method="post">
       {% csrf_token %}
-      <div>
-        <label for="id_time_minutes">時間(分)</label>
-        {{ form.time_minutes }}
-        {{ form.time_minutes.errors }}
+      {% include "includes/form_field.html" with field=form.time_minutes help_text="10分、30分、60分など、決めやすい時間だけを選べます。" %}
+      {% include "includes/form_field.html" with field=form.taste_level help_text="今日はどれくらい満たされたか、近いものを選びます。" %}
+      <div class="ui-form-field{% if form.ingredient_categories.errors %} ui-form-field--error{% endif %}">
+        <span class="ui-form-field__label">食材カテゴリ</span>
+        <div class="ui-form-field__control">{{ form.ingredient_categories }}</div>
+        <div class="ui-form-field__meta">
+          {% if form.ingredient_categories.errors %}
+            {% for error in form.ingredient_categories.errors %}
+              <p class="ui-form-field__error">{{ error }}</p>
+            {% endfor %}
+          {% else %}
+            <p class="ui-form-field__help">思い出せる範囲で大丈夫です。</p>
+          {% endif %}
+        </div>
       </div>
-      <div>
-        <label for="id_taste_level">味の満足度</label>
-        {{ form.taste_level }}
-        {{ form.taste_level.errors }}
-      </div>
-      <div>
-        <p>食材カテゴリ</p>
-        {{ form.ingredient_categories }}
-        {{ form.ingredient_categories.errors }}
-      </div>
-      <button type="submit">保存</button>
+      <button class="ui-button" type="submit">保存する</button>
     </form>
+  </section>
 
-    <h2>タグ</h2>
+  <section class="ui-list-card">
+    <h2 class="ui-list-card__title">タグ</h2>
     {% if tags %}
-      <ul>
-        {% for tag in tags %}
-          <li>
-            {{ tag.kind }}: {{ tag.name }}
-            <form method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/tags/{{ tag.id }}/delete">
-              {% csrf_token %}
-              <button type="submit">削除</button>
-            </form>
-          </li>
-        {% endfor %}
-      </ul>
+      {% for tag in tags %}
+        <div class="ui-list-row">
+          <span class="ui-list-row__date">{{ tag.kind }}: {{ tag.name }}</span>
+          <form method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/tags/{{ tag.id }}/delete">
+            {% csrf_token %}
+            <button class="ui-inline-button" type="submit">削除</button>
+          </form>
+        </div>
+      {% endfor %}
     {% else %}
-      <p>タグはまだありません。</p>
+      <p class="ui-empty-state">タグはまだありません。</p>
     {% endif %}
 
-    <form method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/tags/add">
+    <form class="ui-form" method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/tags/add">
       {% csrf_token %}
       <input type="hidden" name="tag_kind" value="{{ default_tag_kind }}" />
-      <input type="text" name="tag_name" placeholder="タグ名" />
-      <button type="submit">タグ追加</button>
+      <div class="ui-form-field">
+        <label class="ui-form-field__label" for="tag_name_input">タグ名</label>
+        <input id="tag_name_input" type="text" name="tag_name" placeholder="タグ名" />
+      </div>
+      <button class="ui-button-secondary" type="submit">タグ追加</button>
     </form>
 
     {% if tag_candidates %}
-      <h3>候補</h3>
-      <ul>
-        {% for tag in tag_candidates %}
-          <li>
-            <form method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/tags/add">
-              {% csrf_token %}
-              <input type="hidden" name="tag_kind" value="{{ tag.kind }}" />
-              <input type="hidden" name="tag_name" value="{{ tag.name }}" />
-              <button type="submit">{{ tag.kind }}: {{ tag.name }}</button>
-            </form>
-          </li>
-        {% endfor %}
-      </ul>
+      <div class="ui-support-text">候補からも追加できます。</div>
+      {% for tag in tag_candidates %}
+        <form method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/tags/add">
+          {% csrf_token %}
+          <input type="hidden" name="tag_kind" value="{{ tag.kind }}" />
+          <input type="hidden" name="tag_name" value="{{ tag.name }}" />
+          <button class="ui-button-secondary" type="submit">{{ tag.kind }}: {{ tag.name }}</button>
+        </form>
+      {% endfor %}
     {% endif %}
+  </section>
 
-    <h2>写真</h2>
+  <section class="ui-list-card">
+    <h2 class="ui-list-card__title">写真</h2>
     {% if photos %}
-      <ul>
-        {% for photo in photos %}
-          <li>
-            <img src="{{ photo.image.url }}" alt="meal photo" width="160" />
-            <form method="post" action="/photos/{{ photo.id }}/delete">
-              {% csrf_token %}
-              <button type="submit">削除</button>
-            </form>
-          </li>
-        {% endfor %}
-      </ul>
+      {% for photo in photos %}
+        <div class="ui-list-row">
+          <img src="{{ photo.image.url }}" alt="meal photo" width="96" />
+          <form method="post" action="/photos/{{ photo.id }}/delete">
+            {% csrf_token %}
+            <button class="ui-inline-button" type="submit">削除</button>
+          </form>
+        </div>
+      {% endfor %}
     {% else %}
-      <p>写真はまだありません。</p>
+      <p class="ui-empty-state">写真はまだありません。</p>
     {% endif %}
 
-    <form method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/photos" enctype="multipart/form-data">
+    <form class="ui-form" method="post" action="/logs/{{ log_date|date:'Y-m-d' }}/photos" enctype="multipart/form-data">
       {% csrf_token %}
-      <div>
-        <input type="file" name="photos" multiple />
+      <div class="ui-form-field">
+        <label class="ui-form-field__label" for="id_photos">写真を追加</label>
+        <input id="id_photos" type="file" name="photos" multiple />
       </div>
-      <button type="submit">写真を追加</button>
+      <button class="ui-button-secondary" type="submit">写真を追加する</button>
     </form>
-  </body>
-</html>
+  </section>
+{% endblock %}

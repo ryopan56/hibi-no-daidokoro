@@ -2,14 +2,22 @@
 
 {% block title %}バックアップ復元{% endblock %}
 
-{% block content %}
-  <h1>バックアップを復元する</h1>
-  <p>同じユーザーとして書き出した ZIP を復元できます。</p>
-  <p>復元すると、現在の記録は元に戻せません（復元前に必要なら再度バックアップしてください）。</p>
+{% block shell_title %}バックアップを復元する{% endblock %}
 
-  <form method="post" action="{% url 'meallog_import' %}" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">ZIP をアップロードして復元</button>
-  </form>
+{% block shell_intro %}
+  <p class="ui-shell-header__intro">
+    右上の設定ハブから入る、低頻度ユーティリティ導線の受け皿です。
+  </p>
+{% endblock %}
+
+{% block content %}
+  <section class="ui-form-card">
+    <p class="ui-card__text">同じユーザーとして書き出した ZIP を復元できます。</p>
+    <p class="ui-card__text">復元すると、現在の記録は元に戻せません。</p>
+    <form class="ui-form" method="post" action="{% url 'meallog_import' %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      {% include "includes/form_field.html" with field=form.backup_file help_text="ZIP ファイルを選択してください。" %}
+      <button class="ui-button" type="submit">ZIP をアップロードして復元</button>
+    </form>
+  </section>
 {% endblock %}

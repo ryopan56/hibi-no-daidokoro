@@ -15,6 +15,30 @@ class SignupForm(forms.ModelForm):
         model = User
         fields = ['login_id']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['login_id'].label = 'login_id'
+        self.fields['login_id'].widget.attrs.update(
+            {
+                'placeholder': 'hino-kitchen',
+                'autocomplete': 'username',
+            }
+        )
+        self.fields['password1'].label = 'password'
+        self.fields['password1'].widget.attrs.update(
+            {
+                'placeholder': '8文字以上を目安に入力',
+                'autocomplete': 'new-password',
+            }
+        )
+        self.fields['password2'].label = 'password_confirm'
+        self.fields['password2'].widget.attrs.update(
+            {
+                'placeholder': 'もう一度入力',
+                'autocomplete': 'new-password',
+            }
+        )
+
     def clean(self):
         cleaned_data = super().clean()
         password1 = cleaned_data.get('password1')
@@ -34,6 +58,23 @@ class SignupForm(forms.ModelForm):
 class LoginForm(forms.Form):
     login_id = forms.CharField()
     password = forms.CharField(widget=forms.PasswordInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['login_id'].label = 'login_id'
+        self.fields['login_id'].widget.attrs.update(
+            {
+                'placeholder': 'hino-kitchen',
+                'autocomplete': 'username',
+            }
+        )
+        self.fields['password'].label = 'password'
+        self.fields['password'].widget.attrs.update(
+            {
+                'placeholder': '••••••••',
+                'autocomplete': 'current-password',
+            }
+        )
 
 
 class NotificationSettingsForm(forms.ModelForm):
