@@ -1,0 +1,19 @@
+<div class="ui-form-field{% if field.errors %} ui-form-field--error{% endif %}">
+  <label class="ui-form-field__label" for="{{ field.id_for_label }}">
+    {{ label|default:field.label }}
+  </label>
+  <div class="ui-form-field__control">
+    {{ field }}
+  </div>
+  <div class="ui-form-field__meta">
+    {% if field.errors %}
+      {% for error in field.errors %}
+        <p class="ui-form-field__error">{{ error }}</p>
+      {% endfor %}
+    {% elif help_text %}
+      <p class="ui-form-field__help">{{ help_text }}</p>
+    {% elif field.help_text %}
+      <p class="ui-form-field__help">{{ field.help_text }}</p>
+    {% endif %}
+  </div>
+</div>

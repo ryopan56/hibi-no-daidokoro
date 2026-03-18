@@ -1,38 +1,39 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <title>Signup</title>
-  </head>
-  <body>
-    <h1>サインアップ</h1>
+{% extends "base.html" %}
 
+{% block title %}サインアップ{% endblock %}
+
+{% block shell_title %}はじめる準備{% endblock %}
+
+{% block shell_intro %}
+  <p class="ui-shell-header__intro">
+    まだ整っていなくても大丈夫です。まずは使える入口だけを、静かに用意します。
+  </p>
+{% endblock %}
+
+{% block utility_links %}
+  <a class="ui-inline-button" href="{% url 'login' %}">login</a>
+{% endblock %}
+
+{% block content %}
+  <section class="ui-form-card">
     {% if form.non_field_errors %}
-      <div>
-        {{ form.non_field_errors }}
+      <div class="ui-error-summary">
+        <p class="ui-error-summary__title">入力内容を確認してください</p>
+        <ul class="ui-error-summary__list">
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
       </div>
     {% endif %}
 
-    <form method="post">
+    <form class="ui-form" method="post">
       {% csrf_token %}
-      <div>
-        <label for="id_login_id">ログインID</label>
-        {{ form.login_id }}
-        {{ form.login_id.errors }}
-      </div>
-      <div>
-        <label for="id_password1">パスワード</label>
-        {{ form.password1 }}
-        {{ form.password1.errors }}
-      </div>
-      <div>
-        <label for="id_password2">パスワード（確認）</label>
-        {{ form.password2 }}
-        {{ form.password2.errors }}
-      </div>
-      <button type="submit">登録</button>
+      {% include "includes/form_field.html" with field=form.login_id help_text="あとで使いやすい login_id を決めます。" %}
+      {% include "includes/form_field.html" with field=form.password1 help_text="8文字以上を目安にすると安心です。" %}
+      {% include "includes/form_field.html" with field=form.password2 help_text="確認のため、同じパスワードを入力してください。" %}
+      <button class="ui-button" type="submit">登録する</button>
+      <a class="ui-button-secondary" href="{% url 'login' %}">すでに登録済みの方はこちら</a>
     </form>
-
-    <p><a href="/login/">ログインへ</a></p>
-  </body>
-</html>
+  </section>
+{% endblock %}

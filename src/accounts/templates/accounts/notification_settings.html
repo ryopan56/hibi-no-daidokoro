@@ -2,25 +2,27 @@
 
 {% block title %}通知設定{% endblock %}
 
+{% block shell_title %}通知設定{% endblock %}
+
+{% block shell_intro %}
+  <p class="ui-shell-header__intro">
+    高頻度ではない設定は、右上の設定ハブ側で静かに扱う前提です。
+  </p>
+{% endblock %}
+
 {% block content %}
-  <h1>通知設定</h1>
-
-  {% if messages %}
-    {% for message in messages %}
-      <p>{{ message }}</p>
-    {% endfor %}
-  {% endif %}
-
-  <form method="post">
-    {% csrf_token %}
-    <div>
-      <label for="id_notifications_enabled">アプリ内通知を表示する</label>
-      {{ form.notifications_enabled }}
-    </div>
-    <div>
-      <label for="id_weekly_praise_enabled">週次肯定を表示する</label>
-      {{ form.weekly_praise_enabled }}
-    </div>
-    <button type="submit">保存</button>
-  </form>
+  <section class="ui-form-card">
+    <form class="ui-form" method="post">
+      {% csrf_token %}
+      <label class="ui-list-row">
+        <span class="ui-list-row__date">アプリ内通知を表示する</span>
+        {{ form.notifications_enabled }}
+      </label>
+      <label class="ui-list-row">
+        <span class="ui-list-row__date">週次肯定を表示する</span>
+        {{ form.weekly_praise_enabled }}
+      </label>
+      <button class="ui-button" type="submit">保存する</button>
+    </form>
+  </section>
 {% endblock %}

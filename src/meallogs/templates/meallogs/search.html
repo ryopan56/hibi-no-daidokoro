@@ -1,49 +1,42 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <title>検索</title>
-  </head>
-  <body>
-    <h1>過去ログ検索</h1>
+{% extends "base.html" %}
 
-    <form method="post">
+{% block title %}検索{% endblock %}
+
+{% block shell_title %}過去ログ検索{% endblock %}
+
+{% block shell_intro %}
+  <p class="ui-shell-header__intro">
+    ボトムナビの高頻度導線として、過去の記録を日付やキーワードで探せる受け皿です。
+  </p>
+{% endblock %}
+
+{% block content %}
+  <section class="ui-form-card">
+    <form class="ui-form" method="post">
       {% csrf_token %}
-      <div>
-        <label for="id_q">キーワード</label>
-        {{ form.q }}
-        {{ form.q.errors }}
-      </div>
-      <div>
-        <label for="id_date_from">開始日</label>
-        {{ form.date_from }}
-        {{ form.date_from.errors }}
-      </div>
-      <div>
-        <label for="id_date_to">終了日</label>
-        {{ form.date_to }}
-        {{ form.date_to.errors }}
-      </div>
-      <button type="submit">検索</button>
+      {% include "includes/form_field.html" with field=form.q help_text="タグや食材、気分などを組み合わせて探せます。" %}
+      {% include "includes/form_field.html" with field=form.date_from help_text="絞り込みたい開始日があれば指定します。" %}
+      {% include "includes/form_field.html" with field=form.date_to help_text="開始日以降の日付を指定してください。" %}
+      <button class="ui-button" type="submit">検索する</button>
     </form>
+  </section>
 
+  <section class="ui-list-card">
+    <p class="ui-list-card__eyebrow">search result</p>
+    <h2 class="ui-list-card__title">検索結果</h2>
     {% if searched %}
-      <h2>検索結果</h2>
       {% if meallogs %}
-        <ul>
-          {% for meallog in meallogs %}
-            <li>
-              <a href="{% url 'meallog_detail' log_date=meallog.log_date|date:'Y-m-d' %}">
-                {{ meallog.log_date }}
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
+        {% for meallog in meallogs %}
+          <a class="ui-list-row" href="{% url 'meallog_detail' log_date=meallog.log_date|date:'Y-m-d' %}">
+            <span class="ui-list-row__date">{{ meallog.log_date|date:"Y.m.d" }}</span>
+            <span class="ui-list-row__meta">記録を見る</span>
+          </a>
+        {% endfor %}
       {% else %}
-        <p>該当する記録はありません。</p>
+        <p class="ui-empty-state">該当する記録はありません。</p>
       {% endif %}
     {% else %}
-      <p>キーワードまたは日付範囲を入力して検索してください。</p>
+      <p class="ui-empty-state">キーワードまたは日付範囲を入力して検索してください。</p>
     {% endif %}
-  </body>
-</html>
+  </section>
+{% endblock %}

@@ -1,0 +1,20 @@
+<nav class="ui-bottom-nav" aria-label="主要ナビゲーション">
+  <a
+    class="ui-bottom-nav__link{% if request.path == '/' or request.path == '/home/' %} is-active{% endif %}"
+    href="{% url 'home' %}"
+  >
+    Home
+  </a>
+  <a
+    class="ui-bottom-nav__link{% if request.path == '/calendar/' %} is-active{% endif %}"
+    href="{% url 'meallog_calendar' %}"
+  >
+    Calendar
+  </a>
+  <a
+    class="ui-bottom-nav__link{% if request.path == '/search/' or request.path == '/search' %} is-active{% endif %}"
+    href="{% url 'meallog_search' %}"
+  >
+    Search
+  </a>
+</nav>

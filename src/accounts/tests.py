@@ -4,6 +4,8 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
+from meallogs.models import MealLog
+
 from .models import NotificationSettings
 from .services.weekly_praise_trigger import current_week_start_jst
 from .services.weekly_praise import WEEKLY_PRAISE_FALLBACK, WeeklyPraiseError
@@ -187,3 +189,35 @@ class WeeklyPraiseWeekStartTests(TestCase):
     def test_week_start_on_monday(self, mock_localdate):
         mock_localdate.return_value = date(2026, 3, 9)  # Monday
         self.assertEqual(current_week_start_jst(), date(2026, 3, 8))
+
+
+class UiFoundationTemplateTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = get_user_model().objects.create_user(
+            login_id='foundation-user',
+            password='pass12345',
+        )
+
+    def test_login_uses_auth_shell_with_signup_secondary_cta(self):
+        response = self.client.get('/login/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-startup-layer')
+        self.assertContains(response, 'ログインする')
+        self.assertContains(response, '初めての方はこちら')
+        self.assertNotContains(response, 'Calendar')
+
+    def test_home_shows_transient_area_recent_logs_and_bottom_nav(self):
+        MealLog.objects.create(user=self.user, log_date=date(2026, 3, 18))
+        MealLog.objects.create(user=self.user, log_date=date(2026, 3, 17))
+        self.client.login(login_id='foundation-user', password='pass12345')
+
+        response = self.client.get('/home/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'temporary message area')
+        self.assertContains(response, '日付ごとのログ一覧')
+        self.assertContains(response, '2026.03.18')
+        self.assertContains(response, 'Home')
+        self.assertContains(response, 'Calendar')
+        self.assertContains(response, 'Search')
+        self.assertContains(response, '設定ハブ')

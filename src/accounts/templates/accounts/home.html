@@ -2,31 +2,55 @@
 
 {% block title %}ホーム{% endblock %}
 
-{% block content %}
-  <h1>ホーム</h1>
+{% block shell_title %}おかえりなさい{% endblock %}
 
-  {% if show_welcome %}
-    <p>今日もここに来てくれてありがとうございます。記録はいつでも、できる範囲で大丈夫です。</p>
-  {% endif %}
+{% block shell_intro %}
+  <p class="ui-shell-header__intro">
+    最初に見るべき行動を主役にしつつ、日付ごとの記録へ自然につながる土台を置いています。
+  </p>
+{% endblock %}
 
-  {% if weekly_praise %}
-    <section>
-      <h2>{{ weekly_praise.headline }}</h2>
-      <p>{{ weekly_praise.message }}</p>
+{% block transient_message %}
+  {% if show_welcome or weekly_praise %}
+    <section class="ui-transient-message">
+      <p class="ui-transient-message__eyebrow">temporary message area</p>
+      {% if show_welcome %}
+        <p class="ui-transient-message__text">今日もここに来てくれてありがとうございます。記録は、できる範囲で大丈夫です。</p>
+      {% endif %}
+      {% if weekly_praise %}
+        <p class="ui-transient-message__text">{{ weekly_praise.headline }}: {{ weekly_praise.message }}</p>
+      {% endif %}
     </section>
   {% endif %}
+{% endblock %}
 
-  <p>login_id: {{ request.user.login_id }}</p>
-  <p><a href="/settings/notifications/">通知設定</a></p>
-  <p><a href="{% url 'meallog_export' %}">バックアップを書き出す</a></p>
-  <p><a href="{% url 'meallog_import' %}">バックアップを復元する</a></p>
+{% block content %}
+  <section class="ui-card">
+    <p class="ui-card__eyebrow">primary action</p>
+    <h2 class="ui-card__title">今夜の記録をひらく</h2>
+    <p class="ui-card__text">
+      今日の記録にすぐ入れる入口を主役にしつつ、その下に日付ごとのログ一覧受け皿を続けます。
+    </p>
+    <form method="get" action="/logs/today/">
+      <button class="ui-button" type="submit">今日の記録を見る</button>
+    </form>
+  </section>
 
-  <form method="get" action="/logs/today/">
-    <button type="submit">今日の記録へ</button>
-  </form>
-
-  <form method="post" action="/logout/">
-    {% csrf_token %}
-    <button type="submit">ログアウト</button>
-  </form>
+  <section class="ui-list-card">
+    <p class="ui-list-card__eyebrow">date logs</p>
+    <h2 class="ui-list-card__title">日付ごとのログ一覧</h2>
+    <p class="ui-list-card__text">
+      Home から日付単位ログ一覧へつながる受け皿です。通知設定 / Export / Import は右上の設定ハブで扱います。
+    </p>
+    {% if recent_logs %}
+      {% for meallog in recent_logs %}
+        <a class="ui-list-row" href="{% url 'meallog_detail' log_date=meallog.log_date|date:'Y-m-d' %}">
+          <span class="ui-list-row__date">{{ meallog.log_date|date:"Y.m.d" }}</span>
+          <span class="ui-list-row__meta">log summary</span>
+        </a>
+      {% endfor %}
+    {% else %}
+      <p class="ui-empty-state">まだ一覧は空です。今日の記録から始められます。</p>
+    {% endif %}
+  </section>
 {% endblock %}

@@ -57,6 +57,12 @@ class MealLogSearchForm(forms.Form):
     date_from = forms.DateField(required=False, label="開始日")
     date_to = forms.DateField(required=False, label="終了日")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["q"].widget.attrs.update({"placeholder": "タグや気分、食材を入力"})
+        self.fields["date_from"].widget.attrs.update({"type": "date"})
+        self.fields["date_to"].widget.attrs.update({"type": "date"})
+
     def clean(self):
         cleaned_data = super().clean()
         date_from = cleaned_data.get("date_from")

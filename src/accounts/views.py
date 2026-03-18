@@ -7,6 +7,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
+from meallogs.models import MealLog
+
 from .forms import LoginForm, NotificationSettingsForm, SignupForm
 from .services.weekly_praise_trigger import (
     consume_weekly_praise_for_home,
@@ -84,6 +86,7 @@ def home(request):
         request.session[WELCOME_SHOWN_DATE_KEY] = today_str
         request.session[JUST_LOGGED_IN_KEY] = False
     weekly_praise, _ = consume_weekly_praise_for_home(request.user)
+    recent_logs = MealLog.objects.filter(user=request.user).order_by("-log_date")[:5]
 
     logger.info(
         "home access login_id=%s welcome=%s",
@@ -97,6 +100,7 @@ def home(request):
         {
             "show_welcome": show_welcome,
             "weekly_praise": weekly_praise,
+            "recent_logs": recent_logs,
         },
     )
 

@@ -1,17 +1,61 @@
+{% load static %}
 <!doctype html>
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <title>{% block title %}hibi-no-daidokoro{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}日々の台所{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'meallogs/ui-foundation.css' %}" />
+    <script defer src="{% static 'meallogs/ui-foundation.js' %}"></script>
+    {% block extra_head %}{% endblock %}
   </head>
-  <body>
-    {% if messages %}
-      <ul>
-        {% for message in messages %}
-          <li>{{ message }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-    {% block content %}{% endblock %}
+  <body class="ui-body {% if request.user.is_authenticated %}ui-body-app{% else %}ui-body-auth{% endif %}">
+    <div class="startup-copy-layer" data-startup-layer hidden aria-hidden="true">
+      <div class="startup-copy-layer__surface">
+        <p class="startup-copy-layer__headline" data-startup-copy-text>今日はこれでいい。</p>
+        <p class="startup-copy-layer__note">
+          ここに来たこと自体で、もう十分です。
+        </p>
+      </div>
+    </div>
+
+    <div class="ui-app-background" aria-hidden="true">
+      <div class="ui-app-background__glow ui-app-background__glow--top"></div>
+      <div class="ui-app-background__glow ui-app-background__glow--bottom"></div>
+    </div>
+
+    <div class="ui-page-shell">
+      <div class="ui-page-surface">
+        <header class="ui-shell-header">
+          <div class="ui-shell-header__copy">
+            <p class="ui-shell-header__eyebrow">{% block shell_eyebrow %}日々の台所{% endblock %}</p>
+            <h1 class="ui-shell-header__title">{% block shell_title %}日々の台所{% endblock %}</h1>
+            {% block shell_intro %}
+            {% endblock %}
+          </div>
+
+          <div class="ui-shell-header__utility">
+            {% block utility_links %}
+              {% if request.user.is_authenticated %}
+                {% include "includes/utility_hub.html" %}
+              {% endif %}
+            {% endblock %}
+          </div>
+        </header>
+
+        <section class="ui-message-stack" aria-live="polite">
+          {% block transient_message %}{% endblock %}
+          {% include "includes/messages.html" %}
+        </section>
+
+        <main class="ui-page-content">
+          {% block content %}{% endblock %}
+        </main>
+
+        {% if request.user.is_authenticated %}
+          {% include "includes/bottom_nav.html" %}
+        {% endif %}
+      </div>
+    </div>
   </body>
 </html>

@@ -1,33 +1,38 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <title>Login</title>
-  </head>
-  <body>
-    <h1>ログイン</h1>
+{% extends "base.html" %}
 
+{% block title %}ログイン{% endblock %}
+
+{% block shell_title %}日々の台所{% endblock %}
+
+{% block shell_intro %}
+  <p class="ui-shell-header__intro">
+    Startup のあと、すぐ login に入れるよう導線を短くしています。ここではログインを主 CTA にします。
+  </p>
+{% endblock %}
+
+{% block utility_links %}
+  <a class="ui-inline-button" href="{% url 'signup' %}">signup</a>
+{% endblock %}
+
+{% block content %}
+  <section class="ui-form-card">
     {% if form.non_field_errors %}
-      <div>
-        {{ form.non_field_errors }}
+      <div class="ui-error-summary">
+        <p class="ui-error-summary__title">ログインをもう一度お試しください</p>
+        <ul class="ui-error-summary__list">
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
       </div>
     {% endif %}
 
-    <form method="post">
+    <form class="ui-form" method="post">
       {% csrf_token %}
-      <div>
-        <label for="id_login_id">ログインID</label>
-        {{ form.login_id }}
-        {{ form.login_id.errors }}
-      </div>
-      <div>
-        <label for="id_password">パスワード</label>
-        {{ form.password }}
-        {{ form.password.errors }}
-      </div>
-      <button type="submit">ログイン</button>
+      {% include "includes/form_field.html" with field=form.login_id help_text="ログインIDを入力してください。" %}
+      {% include "includes/form_field.html" with field=form.password help_text="パスワードを入力してください。" %}
+      <button class="ui-button" type="submit">ログインする</button>
+      <a class="ui-button-secondary" href="{% url 'signup' %}">初めての方はこちら</a>
     </form>
-
-    <p><a href="/signup/">サインアップへ</a></p>
-  </body>
-</html>
+  </section>
+{% endblock %}
