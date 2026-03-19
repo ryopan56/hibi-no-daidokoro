@@ -40,15 +40,15 @@ args = [
 env_vars = ["NOTION_TOKEN"]
 
 enabled_tools = [
-  "mcp__notion__API-get-block-children",
-  "mcp__notion__API-get-self",
-  "mcp__notion__API-post-search",
-  "mcp__notion__API-query-data-source",
-  "mcp__notion__API-retrieve-a-block",
-  "mcp__notion__API-retrieve-a-data-source",
-  "mcp__notion__API-retrieve-a-database",
-  "mcp__notion__API-retrieve-a-page",
-  "mcp__notion__API-retrieve-a-page-property"
+  "API-get-block-children",
+  "API-get-self",
+  "API-post-search",
+  "API-query-data-source",
+  "API-retrieve-a-block",
+  "API-retrieve-a-data-source",
+  "API-retrieve-a-database",
+  "API-retrieve-a-page",
+  "API-retrieve-a-page-property"
 ]
 
 startup_timeout_sec = 20
